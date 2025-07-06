@@ -11,7 +11,7 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose }) => {
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
-  const { user } = useAuth();
+  const { profile } = useAuth();
 
   if (!isOpen) return null;
 
@@ -80,7 +80,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
                   </p>
 
                   {/* Admin Review Actions */}
-                  {notification.type === 'upload_review' && user?.isAdmin && !notification.read && (
+                  {notification.type === 'upload_review' && profile?.is_admin && !notification.read && (
                     <div className="flex items-center space-x-2 mt-3">
                       {notification.data?.thumbnail && (
                         <img

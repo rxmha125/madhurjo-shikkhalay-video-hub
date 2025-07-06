@@ -7,13 +7,13 @@ import InfiniteScroll from 'react-infinite-scroll-component';
 import VideoCard from '../components/VideoCard';
 
 interface Video {
-  _id: string;
+  id: string;
   title: string;
   thumbnail: string;
   views: number;
-  createdAt: Date;
+  created_at: string;
   creator: {
-    _id: string;
+    id: string;
     name: string;
     avatar?: string;
   };
@@ -21,7 +21,7 @@ interface Video {
 
 const Profile = () => {
   const { id } = useParams();
-  const { user, updateProfile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const [profileUser, setProfileUser] = useState<any>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -32,7 +32,7 @@ const Profile = () => {
     description: ''
   });
 
-  const isOwnProfile = user?._id === id;
+  const isOwnProfile = profile?.id === id;
 
   useEffect(() => {
     loadProfile();
@@ -40,19 +40,19 @@ const Profile = () => {
   }, [id]);
 
   const loadProfile = () => {
-    // In real app, this would fetch from MongoDB
-    if (isOwnProfile && user) {
-      setProfileUser(user);
+    // In real app, this would fetch from Supabase
+    if (isOwnProfile && profile) {
+      setProfileUser(profile);
       setEditForm({
-        name: user.name,
-        description: user.description || ''
+        name: profile.name,
+        description: profile.description || ''
       });
     } else {
       // Simulate loading another user's profile
       setProfileUser({
-        _id: id,
+        id: id,
         name: 'Student User',
-        avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=200&h=200&fit=crop&crop=face',
+        avatar: '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png',
         description: 'Eager to learn and grow through quality education.'
       });
     }
@@ -61,7 +61,7 @@ const Profile = () => {
 
   const loadUserVideos = () => {
     // Load videos uploaded by this user
-    // In real app, this would fetch from MongoDB with user filter
+    // In real app, this would fetch from Supabase with user filter
     setVideos([]);
     setHasMore(false);
   };
@@ -100,7 +100,7 @@ const Profile = () => {
             {/* Avatar */}
             <div className="relative group">
               <img
-                src={profileUser?.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face'}
+                src={profileUser?.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
                 alt={profileUser?.name}
                 className="w-32 h-32 rounded-full object-cover border-4 border-blue-500/30"
               />
@@ -240,7 +240,7 @@ const Profile = () => {
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {videos.map((video) => (
-                    <VideoCard key={video._id} video={video} />
+                    <VideoCard key={video.id} video={video} />
                   ))}
                 </div>
               </InfiniteScroll>

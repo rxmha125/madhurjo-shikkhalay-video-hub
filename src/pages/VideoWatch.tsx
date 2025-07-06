@@ -7,15 +7,15 @@ import { useNotifications } from '../contexts/NotificationContext';
 import CommentSection from '../components/CommentSection';
 
 interface VideoData {
-  _id: string;
+  id: string;
   title: string;
   description: string;
   videoUrl: string;
   views: number;
   likes: number;
-  createdAt: Date;
+  created_at: string;
   creator: {
-    _id: string;
+    id: string;
     name: string;
     avatar?: string;
     followers: number;
@@ -24,7 +24,7 @@ interface VideoData {
 
 const VideoWatch = () => {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { addNotification } = useNotifications();
   const [video, setVideo] = useState<VideoData | null>(null);
   const [liked, setLiked] = useState(false);
@@ -36,19 +36,19 @@ const VideoWatch = () => {
   }, [id]);
 
   const loadVideo = () => {
-    // In real app, this would fetch video data from MongoDB
+    // In real app, this would fetch video data from Supabase
     // For demo, we'll show a placeholder
     setTimeout(() => {
       setVideo({
-        _id: id || '',
+        id: id || '',
         title: 'Sample Educational Video',
         description: 'This is a sample educational video description that would be loaded from the database.',
         videoUrl: 'https://sample-video-url.mp4',
         views: 1234,
         likes: 89,
-        createdAt: new Date(),
+        created_at: new Date().toISOString(),
         creator: {
-          _id: 'teacher-id',
+          id: 'teacher-id',
           name: 'Harez Uddin Hero',
           avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=50&h=50&fit=crop&crop=face',
           followers: 256
@@ -59,7 +59,7 @@ const VideoWatch = () => {
   };
 
   const handleLike = () => {
-    if (!user) return;
+    if (!profile) return;
     
     setLiked(!liked);
     setVideo(prev => prev ? {
@@ -68,17 +68,17 @@ const VideoWatch = () => {
     } : null);
 
     // Send notification to video creator
-    if (!liked && video && video.creator._id !== user._id) {
+    if (!liked && video && video.creator.id !== profile.id) {
       addNotification({
         type: 'like',
-        message: `${user.name} liked your video "${video.title}"`,
+        message: `${profile.name} liked your video "${video.title}"`,
         read: false
       });
     }
   };
 
   const handleFollow = () => {
-    if (!user) return;
+    if (!profile) return;
     setFollowing(!following);
   };
 
@@ -153,7 +153,7 @@ const VideoWatch = () => {
                     <span>{video.views.toLocaleString()} views</span>
                   </div>
                   <span>•</span>
-                  <span>{new Date(video.createdAt).toLocaleDateString()}</span>
+                  <span>{new Date(video.created_at).toLocaleDateString()}</span>
                 </div>
 
                 <div className="flex items-center space-x-3">
@@ -184,11 +184,11 @@ const VideoWatch = () => {
             <div className="rounded-card p-6">
               <div className="flex items-center justify-between">
                 <Link 
-                  to={`/profile/${video.creator._id}`}
+                  to={`/profile/${video.creator.id}`}
                   className="flex items-center space-x-4 group"
                 >
                   <img
-                    src={video.creator.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=50&h=50&fit=crop&crop=face'}
+                    src={video.creator.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
                     alt={video.creator.name}
                     className="w-12 h-12 rounded-full object-cover"
                   />
@@ -202,7 +202,7 @@ const VideoWatch = () => {
                   </div>
                 </Link>
 
-                {user && video.creator._id !== user._id && (
+                {profile && video.creator.id !== profile.id && (
                   <button
                     onClick={handleFollow}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
@@ -227,7 +227,7 @@ const VideoWatch = () => {
             </div>
 
             {/* Comments Section */}
-            <CommentSection videoId={video._id} />
+            <CommentSection videoId={video.id} />
           </div>
 
           {/* Recommended Videos Sidebar */}

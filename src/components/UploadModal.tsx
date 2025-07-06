@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Upload, Check, Clock, User } from 'lucide-react';
+import { X, Upload, Check, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
     visibility: 'public' as 'public' | 'private' | 'scheduled'
   });
   const [uploading, setUploading] = useState(false);
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { addNotification } = useNotifications();
 
   const handleFileUpload = (file: File, type: 'video' | 'thumbnail') => {
@@ -42,7 +42,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
       // Simulate upload process
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      if (user?.isAdmin) {
+      if (profile?.is_admin) {
         toast.success('Video uploaded successfully!');
         setStep(4);
       } else {
@@ -53,7 +53,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
           read: false,
           data: {
             videoTitle: formData.title,
-            uploaderName: user?.name,
+            uploaderName: profile?.name,
             thumbnail: formData.thumbnail ? URL.createObjectURL(formData.thumbnail) : null
           }
         });
@@ -282,7 +282,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
         {/* Step 4: Review & Submit */}
         {step === 4 && (
           <div className="text-center">
-            {user?.isAdmin ? (
+            {profile?.is_admin ? (
               <div>
                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check size={32} className="text-white" />

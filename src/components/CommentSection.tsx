@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle, MoreVertical } from 'lucide-react';
+import { Heart, MessageCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 
 interface Comment {
-  _id: string;
+  id: string;
   content: string;
   author: {
-    _id: string;
+    id: string;
     name: string;
     avatar?: string;
   };
@@ -27,7 +27,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
   const [newComment, setNewComment] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
-  const { user } = useAuth();
+  const { profile } = useAuth();
   const { addNotification } = useNotifications();
 
   useEffect(() => {
@@ -35,21 +35,21 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
   }, [videoId]);
 
   const loadComments = () => {
-    // In real app, this would fetch comments from MongoDB
+    // In real app, this would fetch comments from Supabase
     setComments([]);
   };
 
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !user) return;
+    if (!newComment.trim() || !profile) return;
 
     const comment: Comment = {
-      _id: Date.now().toString(),
+      id: Date.now().toString(),
       content: newComment,
       author: {
-        _id: user._id,
-        name: user.name,
-        avatar: user.avatar
+        id: profile.id,
+        name: profile.name,
+        avatar: profile.avatar
       },
       likes: 0,
       replies: [],
@@ -62,21 +62,21 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
     // Send notification
     addNotification({
       type: 'comment',
-      message: `${user.name} commented on a video`,
+      message: `${profile.name} commented on a video`,
       read: false
     });
   };
 
   const handleReplySubmit = (parentId: string) => {
-    if (!replyContent.trim() || !user) return;
+    if (!replyContent.trim() || !profile) return;
 
     const reply: Comment = {
-      _id: Date.now().toString(),
+      id: Date.now().toString(),
       content: replyContent,
       author: {
-        _id: user._id,
-        name: user.name,
-        avatar: user.avatar
+        id: profile.id,
+        name: profile.name,
+        avatar: profile.avatar
       },
       likes: 0,
       replies: [],
@@ -84,7 +84,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
     };
 
     setComments(prev => prev.map(comment => 
-      comment._id === parentId 
+      comment.id === parentId 
         ? { ...comment, replies: [...comment.replies, reply] }
         : comment
     ));
@@ -96,11 +96,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
   const handleLike = (commentId: string, isReply: boolean = false, parentId?: string) => {
     if (isReply && parentId) {
       setComments(prev => prev.map(comment => 
-        comment._id === parentId 
+        comment.id === parentId 
           ? {
               ...comment,
               replies: comment.replies.map(reply =>
-                reply._id === commentId
+                reply.id === commentId
                   ? { ...reply, liked: !reply.liked, likes: reply.liked ? reply.likes - 1 : reply.likes + 1 }
                   : reply
               )
@@ -109,7 +109,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
       ));
     } else {
       setComments(prev => prev.map(comment => 
-        comment._id === commentId 
+        comment.id === commentId 
           ? { ...comment, liked: !comment.liked, likes: comment.liked ? comment.likes - 1 : comment.likes + 1 }
           : comment
       ));
@@ -124,7 +124,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
     <div className={`${isReply ? 'ml-12' : ''} space-y-3`}>
       <div className="flex space-x-3">
         <img
-          src={comment.author.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face'}
+          src={comment.author.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
           alt={comment.author.name}
           className="w-8 h-8 rounded-full object-cover flex-shrink-0"
         />
@@ -142,7 +142,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
 
           <div className="flex items-center space-x-4 text-xs text-gray-400">
             <button
-              onClick={() => handleLike(comment._id, isReply, parentId)}
+              onClick={() => handleLike(comment.id, isReply, parentId)}
               className={`flex items-center space-x-1 hover:text-red-400 transition-colors ${
                 comment.liked ? 'text-red-400' : ''
               }`}
@@ -153,7 +153,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
 
             {!isReply && (
               <button
-                onClick={() => setReplyingTo(replyingTo === comment._id ? null : comment._id)}
+                onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
                 className="flex items-center space-x-1 hover:text-blue-400 transition-colors"
               >
                 <MessageCircle size={12} />
@@ -163,11 +163,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
           </div>
 
           {/* Reply Form */}
-          {replyingTo === comment._id && (
+          {replyingTo === comment.id && (
             <form 
               onSubmit={(e) => {
                 e.preventDefault();
-                handleReplySubmit(comment._id);
+                handleReplySubmit(comment.id);
               }}
               className="mt-3"
             >
@@ -197,10 +197,10 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
         <div className="space-y-3">
           {comment.replies.map((reply) => (
             <CommentItem 
-              key={reply._id} 
+              key={reply.id} 
               comment={reply} 
               isReply={true} 
-              parentId={comment._id} 
+              parentId={comment.id} 
             />
           ))}
         </div>
@@ -215,12 +215,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
       </h3>
 
       {/* Comment Form */}
-      {user ? (
+      {profile ? (
         <form onSubmit={handleCommentSubmit} className="mb-8">
           <div className="flex space-x-3">
             <img
-              src={user.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=40&h=40&fit=crop&crop=face'}
-              alt={user.name}
+              src={profile.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
+              alt={profile.name}
               className="w-8 h-8 rounded-full object-cover flex-shrink-0"
             />
             <div className="flex-1 space-y-3">
@@ -257,7 +257,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
           </div>
         ) : (
           comments.map((comment) => (
-            <CommentItem key={comment._id} comment={comment} />
+            <CommentItem key={comment.id} comment={comment} />
           ))
         )}
       </div>

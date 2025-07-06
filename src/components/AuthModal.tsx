@@ -33,19 +33,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     
     try {
-      let success = false;
-      
       if (isLogin) {
-        success = await login(email, password);
-        if (success) {
+        const { error } = await login(email, password);
+        if (!error) {
           toast.success('Successfully logged in!');
           onClose();
         } else {
           toast.error('Invalid credentials');
         }
       } else {
-        success = await signup(email, password, name);
-        if (success) {
+        const { error } = await signup(email, password, name);
+        if (!error) {
           toast.success('Account created successfully!');
           onClose();
         } else {
