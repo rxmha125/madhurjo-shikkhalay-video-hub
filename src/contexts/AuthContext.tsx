@@ -1,21 +1,28 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
 
-interface User {
-  _id: string;
+interface Profile {
+  id: string;
+  user_id: string;
   email: string;
   name: string;
   avatar?: string;
   description?: string;
-  isAdmin: boolean;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string, name: string) => Promise<boolean>;
-  logout: () => void;
-  updateProfile: (updates: Partial<User>) => Promise<void>;
+  profile: Profile | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ error: any }>;
+  signup: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  logout: () => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -31,116 +38,117 @@ export const useAuth = () => {
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      // Verify token and get user data
-      fetchUserData(token);
-    } else {
-      setIsLoading(false);
-    }
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // Fetch user profile after a short delay
+          setTimeout(() => {
+            fetchUserProfile(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserData = async (token: string) => {
+  const fetchUserProfile = async (userId: string) => {
     try {
-      // This would normally make an API call to verify the token
-      // For demo purposes, we'll simulate with localStorage
-      const userData = localStorage.getItem('userData');
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+      } else {
+        setProfile(data);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('userData');
+      console.error('Error fetching profile:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      setIsLoading(true);
-      
-      // Check if user is admin
-      const isAdmin = email === 'hkhero50@gmail.com';
-      
-      // Simulate API call - in real app, this would make HTTP request to MongoDB
-      const userData: User = {
-        _id: Date.now().toString(),
-        email,
-        name: isAdmin ? 'Harez Uddin Hero' : email.split('@')[0],
-        isAdmin,
-        avatar: isAdmin ? '/teacher-avatar.jpg' : undefined
-      };
-
-      localStorage.setItem('authToken', 'demo-token-' + Date.now());
-      localStorage.setItem('userData', JSON.stringify(userData));
-      setUser(userData);
-      
-      return true;
-    } catch (error) {
-      console.error('Login error:', error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
-    try {
-      setIsLoading(true);
-      
-      // Check if email already exists (in real app, this would be server-side validation)
-      const existingUser = localStorage.getItem(`user_${email}`);
-      if (existingUser) {
-        throw new Error('Email already exists');
-      }
-
-      const isAdmin = email === 'hkhero50@gmail.com';
-      
-      const userData: User = {
-        _id: Date.now().toString(),
-        email,
-        name: isAdmin ? 'Harez Uddin Hero' : name,
-        isAdmin,
-        avatar: isAdmin ? '/teacher-avatar.jpg' : undefined
-      };
-
-      localStorage.setItem('authToken', 'demo-token-' + Date.now());
-      localStorage.setItem('userData', JSON.stringify(userData));
-      localStorage.setItem(`user_${email}`, JSON.stringify(userData));
-      setUser(userData);
-      
-      return true;
-    } catch (error) {
-      console.error('Signup error:', error);
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userData');
-    setUser(null);
-  };
-
-  const updateProfile = async (updates: Partial<User>) => {
-    if (!user) return;
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
     
-    const updatedUser = { ...user, ...updates };
-    setUser(updatedUser);
-    localStorage.setItem('userData', JSON.stringify(updatedUser));
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setIsLoading(false);
+    return { error };
+  };
+
+  const signup = async (email: string, password: string, name: string) => {
+    setIsLoading(true);
+    
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
+          name: name,
+        }
+      }
+    });
+
+    setIsLoading(false);
+    return { error };
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user || !profile) return;
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('user_id', user.id);
+
+    if (!error) {
+      setProfile({ ...profile, ...updates });
+    }
   };
 
   return (
     <AuthContext.Provider value={{
       user,
+      profile,
+      session,
       login,
       signup,
       logout,

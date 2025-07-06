@@ -10,22 +10,22 @@ interface ProfileDropdownProps {
 }
 
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose }) => {
-  const { user, logout } = useAuth();
+  const { profile, logout } = useAuth();
 
-  if (!isOpen || !user) return null;
+  if (!isOpen || !profile) return null;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     onClose();
   };
 
   return (
-    <div className="absolute top-12 right-0 w-48 rounded-card shadow-xl z-50">
+    <div className="absolute top-12 right-0 w-48 rounded-card shadow-xl z-50 animate-fade-in">
       <div className="p-2">
         <Link
-          to={`/profile/${user._id}`}
+          to={`/profile/${profile.id}`}
           onClick={onClose}
-          className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
+          className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all duration-300 hover:scale-105"
         >
           <User size={16} />
           <span>Profile</span>
@@ -33,7 +33,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose }) =>
         
         <button
           onClick={handleLogout}
-          className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg transition-colors"
+          className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all duration-300 hover:scale-105"
         >
           <LogOut size={16} />
           <span>Logout</span>

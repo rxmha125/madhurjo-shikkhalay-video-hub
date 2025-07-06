@@ -2,67 +2,110 @@
 import React, { useState, useEffect } from 'react';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import VideoCard from './VideoCard';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Video {
-  _id: string;
+  id: string;
   title: string;
-  thumbnail: string;
+  thumbnail: string | null;
   views: number;
-  createdAt: Date;
+  created_at: string;
   creator: {
-    _id: string;
+    id: string;
     name: string;
     avatar?: string;
   };
-  approved: boolean;
+  is_approved: boolean;
 }
 
 const ExploreSection = () => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const limit = 12;
 
   useEffect(() => {
     loadVideos();
   }, []);
 
-  const loadVideos = () => {
-    // Simulate loading videos from MongoDB
-    // In real app, this would fetch from your backend API
-    setTimeout(() => {
-      const newVideos: Video[] = [];
-      
-      // Add some sample videos if needed for demonstration
-      // Note: Real app should only show approved videos
-      
-      setVideos(prev => [...prev, ...newVideos]);
-      setHasMore(false); // No more videos to load for now
+  const loadVideos = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select(`
+          id,
+          title,
+          thumbnail,
+          views,
+          created_at,
+          is_approved,
+          creator:profiles(
+            id,
+            name,
+            avatar
+          )
+        `)
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        console.error('Error fetching videos:', error);
+        setHasMore(false);
+      } else {
+        const formattedVideos = data?.map(video => ({
+          id: video.id,
+          title: video.title,
+          thumbnail: video.thumbnail,
+          views: video.views || 0,
+          created_at: video.created_at,
+          is_approved: video.is_approved,
+          creator: {
+            id: video.creator?.id || '',
+            name: video.creator?.name || 'Unknown',
+            avatar: video.creator?.avatar
+          }
+        })) || [];
+
+        if (offset === 0) {
+          setVideos(formattedVideos);
+        } else {
+          setVideos(prev => [...prev, ...formattedVideos]);
+        }
+
+        if (formattedVideos.length < limit) {
+          setHasMore(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading videos:', error);
+      setHasMore(false);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const fetchMoreVideos = () => {
-    if (videos.length >= 20) {
-      setHasMore(false);
-      return;
-    }
+    if (!hasMore) return;
+    setOffset(prev => prev + limit);
     loadVideos();
   };
 
   return (
-    <section id="explore" className="py-20 px-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-white mb-4">
+    <section id="explore" className="py-12 sm:py-16 lg:py-20 px-4">
+      <div className="container-responsive">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="heading-responsive font-bold text-white mb-4">
             Explore Educational Content
           </h2>
-          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+          <p className="text-gray-400 text-responsive max-w-2xl mx-auto">
             Discover a vast collection of educational videos carefully curated by expert educators
           </p>
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid-responsive">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="rounded-card p-4 animate-pulse">
                 <div className="bg-gray-700 aspect-video rounded-lg mb-4"></div>
@@ -74,11 +117,11 @@ const ExploreSection = () => {
             ))}
           </div>
         ) : videos.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="rounded-card p-12 max-w-md mx-auto">
-              <div className="text-6xl mb-4">📹</div>
-              <h3 className="text-xl font-semibold text-white mb-2">No videos available</h3>
-              <p className="text-gray-400">
+          <div className="text-center py-16 sm:py-20">
+            <div className="rounded-card p-8 sm:p-12 max-w-md mx-auto">
+              <div className="text-4xl sm:text-6xl mb-4">📹</div>
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No videos available</h3>
+              <p className="text-gray-400 text-sm sm:text-base">
                 Be the first to upload educational content to this platform!
               </p>
             </div>
@@ -99,9 +142,9 @@ const ExploreSection = () => {
               </div>
             }
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid-responsive">
               {videos.map((video) => (
-                <VideoCard key={video._id} video={video} />
+                <VideoCard key={video.id} video={video} />
               ))}
             </div>
           </InfiniteScroll>
