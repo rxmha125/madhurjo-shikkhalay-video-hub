@@ -5,13 +5,13 @@ import { Eye } from 'lucide-react';
 
 interface VideoCardProps {
   video: {
-    _id: string;
+    id: string;
     title: string;
-    thumbnail: string;
+    thumbnail: string | null;
     views: number;
-    createdAt: Date;
+    created_at: string;
     creator: {
-      _id: string;
+      id: string;
       name: string;
       avatar?: string;
     };
@@ -28,7 +28,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
     return views.toString();
   };
 
-  const formatTimeAgo = (date: Date) => {
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -42,11 +43,11 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
   };
 
   return (
-    <div className="video-card">
-      <Link to={`/watch/${video._id}`}>
+    <div className="video-card group cursor-pointer">
+      <Link to={`/watch/${video.id}`}>
         <div className="relative mb-4">
           <img
-            src={video.thumbnail}
+            src={video.thumbnail || '/placeholder.svg'}
             alt={video.title}
             className="w-full aspect-video object-cover rounded-lg"
           />
@@ -59,7 +60,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
       </Link>
 
       <div className="space-y-2">
-        <Link to={`/watch/${video._id}`}>
+        <Link to={`/watch/${video.id}`}>
           <h3 className="font-semibold text-white line-clamp-2 group-hover:text-blue-400 transition-colors">
             {video.title}
           </h3>
@@ -69,15 +70,15 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
           <Eye size={14} />
           <span>{formatViews(video.views)} views</span>
           <span>•</span>
-          <span>{formatTimeAgo(video.createdAt)}</span>
+          <span>{formatTimeAgo(video.created_at)}</span>
         </div>
 
         <Link 
-          to={`/profile/${video.creator._id}`}
+          to={`/profile/${video.creator.id}`}
           className="flex items-center space-x-2 text-sm text-gray-400 hover:text-white transition-colors"
         >
           <img
-            src={video.creator.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=24&h=24&fit=crop&crop=face'}
+            src={video.creator.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
             alt={video.creator.name}
             className="w-6 h-6 rounded-full object-cover"
           />
