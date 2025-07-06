@@ -149,7 +149,7 @@
   }
 
   .video-card {
-    @apply rounded-card p-4 hover:scale-105 transform transition-all duration-300 cursor-pointer group;
+    @apply rounded-card p-4 hover:scale-105 transform transition-all duration-300 cursor-pointer;
   }
 
   .video-card:hover {
