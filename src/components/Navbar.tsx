@@ -42,7 +42,7 @@ const Navbar = () => {
             <div className="flex items-center space-x-3 sm:space-x-6">
               <Link 
                 to="/" 
-                className="brand-font text-lg sm:text-xl xl:text-2xl text-white glow-hover transition-all duration-300"
+                className="brand-font text-lg sm:text-xl xl:text-2xl text-white hover:text-blue-400 transition-colors duration-300"
               >
                 Ma Madhurjo Shikkhalay
               </Link>

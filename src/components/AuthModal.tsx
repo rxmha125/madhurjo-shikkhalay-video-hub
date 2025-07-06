@@ -34,23 +34,46 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     
     try {
       if (isLogin) {
+        console.log('Attempting login...');
         const { error } = await login(email, password);
         if (!error) {
           toast.success('Successfully logged in!');
           onClose();
+          // Reset form
+          setEmail('');
+          setPassword('');
+          setName('');
         } else {
-          toast.error('Invalid credentials');
+          console.error('Login error:', error);
+          if (error.message?.includes('Invalid login credentials')) {
+            toast.error('Invalid email or password');
+          } else if (error.message?.includes('Email not confirmed')) {
+            toast.error('Please check your email and confirm your account before logging in');
+          } else {
+            toast.error(error.message || 'Login failed');
+          }
         }
       } else {
+        console.log('Attempting signup...');
         const { error } = await signup(email, password, name);
         if (!error) {
-          toast.success('Account created successfully!');
+          toast.success('Account created successfully! Please check your email to confirm your account.');
           onClose();
+          // Reset form
+          setEmail('');
+          setPassword('');
+          setName('');
         } else {
-          toast.error('Failed to create account');
+          console.error('Signup error:', error);
+          if (error.message?.includes('User already registered')) {
+            toast.error('An account with this email already exists');
+          } else {
+            toast.error(error.message || 'Failed to create account');
+          }
         }
       }
     } catch (error) {
+      console.error('Auth error:', error);
       toast.error('An error occurred. Please try again.');
     } finally {
       setLoading(false);
