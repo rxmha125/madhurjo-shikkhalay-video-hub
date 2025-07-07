@@ -1,11 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, Heart, Share2, Eye, Calendar, User } from 'lucide-react';
+import { Play, Heart, Share2, Eye, Calendar, User, UserPlus, UserMinus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useFollowSystem } from '../hooks/useFollowSystem';
+import { useViewTracking } from '../hooks/useViewTracking';
+import { formatTimeAgo } from '../utils/timeUtils';
 import CommentSection from '../components/CommentSection';
+import { toast } from 'sonner';
 
 interface Video {
   id: string;
@@ -32,11 +36,16 @@ const VideoWatch = () => {
   const [likeCount, setLikeCount] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const { isFollowing, followerCount, isLoading: followLoading, toggleFollow } = useFollowSystem(video?.creator_id);
+  useViewTracking(id || '');
+
+  const isOwnVideo = profile?.id === video?.creator_id;
 
   useEffect(() => {
     if (id) {
       fetchVideo();
-      incrementViews();
       fetchLikes();
       checkUserLike();
     }
@@ -127,30 +136,7 @@ const VideoWatch = () => {
 
       setHasLiked(!!data);
     } catch (error) {
-      // User hasn't liked the video
       setHasLiked(false);
-    }
-  };
-
-  const incrementViews = async () => {
-    try {
-      if (id) {
-        const { data: currentVideo } = await supabase
-          .from('videos')
-          .select('views')
-          .eq('id', id)
-          .single();
-
-        if (currentVideo) {
-          const newViews = (currentVideo.views || 0) + 1;
-          await supabase
-            .from('videos')
-            .update({ views: newViews })
-            .eq('id', id);
-        }
-      }
-    } catch (error) {
-      console.error('Error incrementing views:', error);
     }
   };
 
@@ -161,7 +147,6 @@ const VideoWatch = () => {
 
     try {
       if (hasLiked) {
-        // Unlike the video
         const { error } = await supabase
           .from('video_likes')
           .delete()
@@ -171,7 +156,6 @@ const VideoWatch = () => {
         if (error) throw error;
         setHasLiked(false);
       } else {
-        // Like the video
         const { error } = await supabase
           .from('video_likes')
           .insert({
@@ -182,7 +166,6 @@ const VideoWatch = () => {
         if (error) throw error;
         setHasLiked(true);
 
-        // Notify video creator about the like
         if (video.creator_id !== profile.id) {
           await addNotification({
             user_id: video.creator_id,
@@ -200,6 +183,32 @@ const VideoWatch = () => {
     }
   };
 
+  const handleDeleteVideo = async () => {
+    if (!video || !profile || !isOwnVideo) return;
+
+    const confirmed = window.confirm('Are you sure you want to delete this video? This action cannot be undone.');
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', video.id);
+
+      if (error) throw error;
+      
+      toast.success('Video deleted successfully');
+      navigate('/');
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      toast.error('Failed to delete video');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -212,12 +221,13 @@ const VideoWatch = () => {
       }
     } else {
       navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard');
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-white text-xl">Loading video...</div>
       </div>
     );
@@ -225,19 +235,18 @@ const VideoWatch = () => {
 
   if (!video) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-white text-xl">Video not found</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="container mx-auto px-4 py-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Video Player Section */}
           <div className="lg:col-span-2">
-            <div className="rounded-xl bg-black/60 backdrop-blur-sm border border-purple-500/20 overflow-hidden shadow-2xl">
+            <div className="rounded-xl bg-black/60 backdrop-blur-sm border border-gray-700 overflow-hidden shadow-2xl">
               {video.video_url ? (
                 <video
                   src={video.video_url}
@@ -249,26 +258,25 @@ const VideoWatch = () => {
                   Your browser does not support the video tag.
                 </video>
               ) : (
-                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-purple-900/50 to-slate-900/50">
-                  <Play size={64} className="text-purple-400" />
+                <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                  <Play size={64} className="text-gray-400" />
                 </div>
               )}
             </div>
 
-            {/* Video Info */}
             <div className="mt-6 space-y-6">
               <h1 className="text-2xl sm:text-3xl font-bold text-white">
                 {video.title}
               </h1>
 
-              <div className="flex flex-wrap items-center gap-4 text-purple-300 text-sm">
+              <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm">
                 <div className="flex items-center space-x-1">
                   <Eye size={16} />
                   <span>{video.views} views</span>
                 </div>
                 <div className="flex items-center space-x-1">
                   <Calendar size={16} />
-                  <span>{new Date(video.created_at).toLocaleDateString()}</span>
+                  <span>{formatTimeAgo(video.created_at)}</span>
                 </div>
               </div>
 
@@ -277,14 +285,29 @@ const VideoWatch = () => {
                   <img
                     src={video.creator?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                     alt={video.creator?.name}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/30"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
                   />
                   <div>
                     <h3 className="font-semibold text-white">
                       {video.creator?.name}
                     </h3>
-                    <p className="text-sm text-purple-300">Creator</p>
+                    <p className="text-sm text-gray-400">{followerCount} followers</p>
                   </div>
+                  
+                  {!isOwnVideo && profile && (
+                    <button
+                      onClick={toggleFollow}
+                      disabled={followLoading}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300 ${
+                        isFollowing
+                          ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      } disabled:opacity-50`}
+                    >
+                      {isFollowing ? <UserMinus size={18} /> : <UserPlus size={18} />}
+                      <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -294,7 +317,7 @@ const VideoWatch = () => {
                     className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300 ${
                       hasLiked
                         ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-lg shadow-red-500/25'
-                        : 'bg-gray-800/50 backdrop-blur-sm border border-purple-500/20 text-purple-300 hover:bg-purple-900/30 hover:border-purple-400/30'
+                        : 'bg-gray-800/50 backdrop-blur-sm border border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500'
                     } disabled:opacity-50`}
                   >
                     <Heart size={18} className={hasLiked ? 'fill-current' : ''} />
@@ -303,25 +326,35 @@ const VideoWatch = () => {
 
                   <button
                     onClick={handleShare}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gray-800/50 backdrop-blur-sm border border-purple-500/20 text-purple-300 hover:bg-purple-900/30 hover:border-purple-400/30 rounded-xl transition-all duration-300"
+                    className="flex items-center space-x-2 px-4 py-2 bg-gray-800/50 backdrop-blur-sm border border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500 rounded-xl transition-all duration-300"
                   >
                     <Share2 size={18} />
                     <span>Share</span>
                   </button>
+
+                  {isOwnVideo && (
+                    <button
+                      onClick={handleDeleteVideo}
+                      disabled={isDeleting}
+                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-xl transition-all duration-300"
+                    >
+                      <Trash2 size={18} />
+                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
               {video.description && (
-                <div className="bg-gray-800/30 backdrop-blur-sm border border-purple-500/20 rounded-xl p-6">
+                <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
                   <h3 className="font-semibold text-white mb-3">Description</h3>
-                  <p className="text-purple-100 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
                     {video.description}
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Comments Section */}
             <CommentSection 
               videoId={video.id} 
               videoTitle={video.title}
@@ -329,13 +362,12 @@ const VideoWatch = () => {
             />
           </div>
 
-          {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-gray-800/30 backdrop-blur-sm border border-purple-500/20 rounded-xl p-6">
+            <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4">
                 Related Videos
               </h3>
-              <div className="text-purple-300 text-center py-8">
+              <div className="text-gray-400 text-center py-8">
                 No related videos available
               </div>
             </div>

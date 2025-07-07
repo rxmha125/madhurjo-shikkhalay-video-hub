@@ -64,6 +64,42 @@ export type Database = {
           },
         ]
       }
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follows_follower_id_fkey"
+            columns: ["follower_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follows_following_id_fkey"
+            columns: ["following_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           content: string | null
@@ -180,6 +216,38 @@ export type Database = {
         }
         Relationships: []
       }
+      thumbnails: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          thumbnail_url: string
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          thumbnail_url: string
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          thumbnail_url?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thumbnails_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_likes: {
         Row: {
           created_at: string
@@ -209,6 +277,45 @@ export type Database = {
           },
           {
             foreignKeyName: "video_likes_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_views: {
+        Row: {
+          created_at: string
+          id: string
+          session_id: string
+          user_id: string | null
+          video_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_id: string
+          user_id?: string | null
+          video_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_id?: string
+          user_id?: string | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_views_video_id_fkey"
             columns: ["video_id"]
             isOneToOne: false
             referencedRelation: "videos"

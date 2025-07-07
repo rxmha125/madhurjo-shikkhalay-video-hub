@@ -30,7 +30,6 @@ const ExploreSection = () => {
 
   const loadVideos = async () => {
     try {
-      // Only query videos table (approved videos)
       const { data, error } = await supabase
         .from('videos')
         .select(`

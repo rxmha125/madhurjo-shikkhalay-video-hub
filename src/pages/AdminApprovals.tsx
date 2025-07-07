@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Clock, Check, X, Play } from 'lucide-react';
+import { formatTimeAgo } from '../utils/timeUtils';
 
 interface PendingVideo {
   id: string;
@@ -21,7 +23,7 @@ interface PendingVideo {
 
 const AdminApprovals = () => {
   const { profile } = useAuth();
-  const { refreshPendingCount } = useNotifications();
+  const { refreshPendingCount, addNotification } = useNotifications();
   const [pendingVideos, setPendingVideos] = useState<PendingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingVideos, setProcessingVideos] = useState<string[]>([]);
@@ -49,8 +51,6 @@ const AdminApprovals = () => {
         toast.error('Failed to load pending videos');
         return;
       }
-
-      console.log('Raw pending videos data:', data);
 
       const formattedVideos = data?.map(video => ({
         id: video.id,
@@ -122,6 +122,15 @@ const AdminApprovals = () => {
         return;
       }
 
+      // Notify the creator about approval
+      await addNotification({
+        user_id: videoData.creator_id,
+        type: 'approval',
+        title: 'Video Approved',
+        content: `Your video "${videoData.title}" has been approved and published!`,
+        video_id: videoId
+      });
+
       setPendingVideos(prev => prev.filter(video => video.id !== videoId));
       refreshPendingCount();
       toast.success('Video approved and published successfully!');
@@ -138,6 +147,13 @@ const AdminApprovals = () => {
     setProcessingVideos(prev => [...prev, videoId]);
 
     try {
+      // Get video data for notification
+      const { data: videoData } = await supabase
+        .from('videos_for_approval')
+        .select('*')
+        .eq('id', videoId)
+        .single();
+
       const { error } = await supabase
         .from('videos_for_approval')
         .delete()
@@ -147,6 +163,16 @@ const AdminApprovals = () => {
         console.error('Error declining video:', error);
         toast.error('Failed to decline video');
         return;
+      }
+
+      // Notify the creator about decline
+      if (videoData) {
+        await addNotification({
+          user_id: videoData.creator_id,
+          type: 'decline',
+          title: 'Video Declined',
+          content: `Your video "${videoData.title}" was not approved for publication.`
+        });
       }
 
       setPendingVideos(prev => prev.filter(video => video.id !== videoId));
@@ -162,10 +188,10 @@ const AdminApprovals = () => {
 
   if (!profile?.is_admin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-white mb-4">Access Denied</h1>
-          <p className="text-purple-300">You don't have permission to access this page.</p>
+          <p className="text-gray-400">You don't have permission to access this page.</p>
         </div>
       </div>
     );
@@ -173,14 +199,14 @@ const AdminApprovals = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-20 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-20 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center space-x-3 mb-8">
           <Clock className="text-yellow-500" size={32} />
@@ -194,12 +220,12 @@ const AdminApprovals = () => {
           <div className="text-center py-20">
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl font-bold text-white mb-4">All caught up!</h2>
-            <p className="text-purple-300">No videos pending approval at the moment.</p>
+            <p className="text-gray-400">No videos pending approval at the moment.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {pendingVideos.map((video) => (
-              <div key={video.id} className="bg-gray-900/50 backdrop-blur-sm border border-purple-500/20 rounded-xl overflow-hidden shadow-2xl">
+              <div key={video.id} className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden shadow-2xl">
                 <div className="relative">
                   {playingVideo === video.id && video.video_url ? (
                     <video
@@ -239,7 +265,7 @@ const AdminApprovals = () => {
                   </h3>
                   
                   {video.description && (
-                    <p className="text-purple-300 text-sm mb-3 line-clamp-3">
+                    <p className="text-gray-400 text-sm mb-3 line-clamp-3">
                       {video.description}
                     </p>
                   )}
@@ -248,13 +274,13 @@ const AdminApprovals = () => {
                     <img
                       src={video.creator.avatar}
                       alt={video.creator.name}
-                      className="w-6 h-6 rounded-full object-cover border border-purple-500/30"
+                      className="w-6 h-6 rounded-full object-cover border border-gray-600"
                     />
-                    <span className="text-sm text-purple-200">{video.creator.name}</span>
+                    <span className="text-sm text-gray-300">{video.creator.name}</span>
                   </div>
 
-                  <div className="text-xs text-purple-400 mb-4">
-                    Uploaded: {new Date(video.created_at).toLocaleDateString()}
+                  <div className="text-xs text-gray-500 mb-4">
+                    Uploaded: {formatTimeAgo(video.created_at)}
                   </div>
 
                   <div className="flex space-x-2">

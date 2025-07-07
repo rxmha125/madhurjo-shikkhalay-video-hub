@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import VideoWatch from "./pages/VideoWatch";
 import Info from "./pages/Info";
 import AdminApprovals from "./pages/AdminApprovals";
+import Subscriptions from "./pages/Subscriptions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
               <Route path="/watch/:id" element={<VideoWatch />} />
               <Route path="/info" element={<Info />} />
               <Route path="/admin/approvals" element={<AdminApprovals />} />
+              <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

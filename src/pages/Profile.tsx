@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pencil, Upload as UploadIcon, Clock, Trash2 } from 'lucide-react';
+import { Pencil, Upload as UploadIcon, Clock, Trash2, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useFollowSystem } from '../hooks/useFollowSystem';
 import VideoCard from '../components/VideoCard';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { formatTimeAgo } from '../utils/timeUtils';
 
 interface Video {
   id: string;
@@ -30,12 +32,14 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState('videos');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [removingVideos, setRemovingVideos] = useState<string[]>([]);
+  const [deletingVideos, setDeletingVideos] = useState<string[]>([]);
   const [editForm, setEditForm] = useState({
     name: '',
     description: ''
   });
 
   const isOwnProfile = profile?.id === id;
+  const { isFollowing, followerCount, isLoading: followLoading, toggleFollow } = useFollowSystem(id);
 
   useEffect(() => {
     loadProfile();
@@ -45,33 +49,44 @@ const Profile = () => {
     }
   }, [id]);
 
-  const loadProfile = () => {
+  const loadProfile = async () => {
     if (isOwnProfile && profile) {
       setProfileUser(profile);
       setEditForm({
         name: profile.name,
         description: profile.description || ''
       });
-    } else {
-      setProfileUser({
-        id: id,
-        name: 'Student User',
-        avatar: '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
-        description: 'Eager to learn and grow through quality education.'
-      });
+    } else if (id) {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+        setProfileUser(data);
+      } catch (error) {
+        console.error('Error loading profile:', error);
+        setProfileUser({
+          id: id,
+          name: 'Student User',
+          avatar: '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
+          description: 'Eager to learn and grow through quality education.'
+        });
+      }
     }
     setLoading(false);
   };
 
   const loadUserVideos = async () => {
-    if (!profile) return;
+    if (!id) return;
     
     try {
-      // Load approved videos from videos table
       const { data, error } = await supabase
         .from('videos')
         .select('*, creator:profiles!videos_creator_id_fkey(id, name, avatar)')
-        .eq('creator_id', profile.id)
+        .eq('creator_id', id)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -102,7 +117,6 @@ const Profile = () => {
     if (!profile) return;
     
     try {
-      // Load pending videos from videos_for_approval table
       const { data, error } = await supabase
         .from('videos_for_approval')
         .select('*, creator:profiles!videos_for_approval_creator_id_fkey(id, name, avatar)')
@@ -275,11 +289,38 @@ const Profile = () => {
     }
   };
 
+  const handleDeleteVideo = async (videoId: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this video? This action cannot be undone.');
+    if (!confirmed) return;
+
+    setDeletingVideos(prev => [...prev, videoId]);
+
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) {
+        console.error('Error deleting video:', error);
+        toast.error('Failed to delete video');
+        return;
+      }
+
+      setVideos(prev => prev.filter(video => video.id !== videoId));
+      toast.success('Video deleted successfully');
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      toast.error('Failed to delete video');
+    } finally {
+      setDeletingVideos(prev => prev.filter(id => id !== videoId));
+    }
+  };
+
   const handleRemoveVideo = async (videoId: string) => {
     setRemovingVideos(prev => [...prev, videoId]);
 
     try {
-      // Delete from videos_for_approval table
       const { error } = await supabase
         .from('videos_for_approval')
         .delete()
@@ -291,7 +332,6 @@ const Profile = () => {
         return;
       }
 
-      // Remove video from pending list
       setPendingVideos(prev => prev.filter(video => video.id !== videoId));
       toast.success('Video removed successfully');
     } catch (error) {
@@ -304,24 +344,22 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen py-20 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 py-20 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Profile Header */}
-        <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 mb-8">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 mb-8">
           <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-            {/* Avatar */}
             <div className="relative group">
               <img
                 src={profileUser?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                 alt={profileUser?.name}
-                className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-blue-500/30"
+                className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-gray-600"
                 onError={(e) => {
                   e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
                 }}
@@ -350,83 +388,58 @@ const Profile = () => {
               )}
             </div>
 
-            {/* Profile Info */}
             <div className="flex-1 text-center md:text-left">
-              {editing ? (
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    value={editForm.name}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white text-2xl font-bold focus:outline-none focus:border-blue-500"
-                    placeholder="Your name"
-                  />
-                  <textarea
-                    value={editForm.description}
-                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white h-24 resize-none focus:outline-none focus:border-blue-500"
-                    placeholder="Tell us about yourself..."
-                  />
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={handleSaveProfile}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => setEditing(false)}
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
-                    <h1 className="text-3xl font-bold text-white">{profileUser?.name}</h1>
-                    {isOwnProfile && (
-                      <button
-                        onClick={() => setEditing(true)}
-                        className="text-gray-400 hover:text-white transition-colors"
-                      >
-                        <Pencil size={20} />
-                      </button>
-                    )}
-                  </div>
-                  
-                  <p className="text-gray-300 leading-relaxed max-w-2xl">
-                    {profileUser?.description || 'No description provided.'}
-                  </p>
+              <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
+                <h1 className="text-3xl font-bold text-white">{profileUser?.name}</h1>
+                {isOwnProfile && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <Pencil size={20} />
+                  </button>
+                )}
+                {!isOwnProfile && profile && (
+                  <button
+                    onClick={toggleFollow}
+                    disabled={followLoading}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300 ${
+                      isFollowing
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    } disabled:opacity-50`}
+                  >
+                    <Users size={18} />
+                    <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
+                  </button>
+                )}
+              </div>
+              
+              <p className="text-gray-400 leading-relaxed max-w-2xl mb-6">
+                {profileUser?.description || 'No description provided.'}
+              </p>
 
-                  {/* Stats */}
-                  <div className="flex justify-center md:justify-start space-x-8 mt-6">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-white">{videos.length}</div>
-                      <div className="text-sm text-gray-400">Videos</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-white">
-                        {videos.reduce((sum, video) => sum + video.views, 0)}
-                      </div>
-                      <div className="text-sm text-gray-400">Total Views</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-white">
-                        {new Date().getFullYear() - 2020}
-                      </div>
-                      <div className="text-sm text-gray-400">Years Active</div>
-                    </div>
-                  </div>
+              <div className="flex justify-center md:justify-start space-x-8">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{videos.length}</div>
+                  <div className="text-sm text-gray-500">Videos</div>
                 </div>
-              )}
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">
+                    {videos.reduce((sum, video) => sum + video.views, 0)}
+                  </div>
+                  <div className="text-sm text-gray-500">Total Views</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">{followerCount}</div>
+                  <div className="text-sm text-gray-500">Followers</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Content Tabs */}
-        <div className="bg-gray-900 border border-gray-700 rounded-lg">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg">
           <div className="border-b border-gray-700">
             <div className="p-6">
               <div className="flex space-x-8 overflow-x-auto">
@@ -452,23 +465,38 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Content Section */}
           <div className="p-6">
             {activeTab === 'videos' ? (
               videos.length === 0 ? (
                 <div className="text-center py-20">
                   <div className="text-6xl mb-4">📹</div>
                   <h3 className="text-xl font-semibold text-white mb-2">No videos available</h3>
-                  <p className="text-gray-400">
-                    {isOwnProfile 
-                      ? 'Upload your first video to get started!' 
-                      : 'This user hasn\'t uploaded any videos yet.'}
+                  <p className="text-gray-500">
+                    {isOwnProfile ? 'Upload your first video to get started!' : 'This user hasn\'t uploaded any videos yet.'}
                   </p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {videos.map((video) => (
-                    <VideoCard key={video.id} video={video} />
+                    <div key={video.id} className="relative group">
+                      <VideoCard video={video} />
+                      {isOwnProfile && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleDeleteVideo(video.id)}
+                            disabled={deletingVideos.includes(video.id)}
+                            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white p-2 rounded-lg transition-colors shadow-lg"
+                            title="Delete video"
+                          >
+                            {deletingVideos.includes(video.id) ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )
@@ -477,7 +505,7 @@ const Profile = () => {
                 <div className="text-center py-20">
                   <div className="text-6xl mb-4">⏳</div>
                   <h3 className="text-xl font-semibold text-white mb-2">No pending videos</h3>
-                  <p className="text-gray-400">All your videos have been approved!</p>
+                  <p className="text-gray-500">All your videos have been approved!</p>
                 </div>
               ) : (
                 <div className="space-y-4">
