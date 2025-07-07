@@ -1,240 +1,285 @@
-
 import React, { useState, useEffect } from 'react';
-import { Heart, MessageCircle } from 'lucide-react';
+import { Heart, MessageCircle, Reply, MoreVertical } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 
 interface Comment {
   id: string;
   content: string;
-  author: {
-    id: string;
+  created_at: string;
+  user_id: string;
+  video_id: string;
+  parent_id?: string;
+  likes: number;
+  dislikes: number;
+  user?: {
     name: string;
     avatar?: string;
   };
-  likes: number;
-  replies: Comment[];
-  createdAt: Date;
-  liked?: boolean;
+  replies?: Comment[];
 }
 
 interface CommentSectionProps {
   videoId: string;
+  videoTitle: string;
+  videoCreatorId: string;
 }
 
-const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
+const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, videoCreatorId }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const { profile } = useAuth();
   const { addNotification } = useNotifications();
 
   useEffect(() => {
-    loadComments();
+    const fetchComments = async () => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('comments')
+          .select(`
+            *,
+            profiles!comments_user_id_fkey (
+              name,
+              avatar
+            )
+          `)
+          .eq('video_id', videoId)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const commentsWithUser = data.map(comment => ({
+          ...comment,
+          user: {
+            name: comment.profiles?.name || 'Unknown User',
+            avatar: comment.profiles?.avatar
+          }
+        }));
+
+        setComments(commentsWithUser);
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchComments();
   }, [videoId]);
 
-  const loadComments = () => {
-    // In real app, this would fetch comments from Supabase
-    setComments([]);
-  };
-
-  const handleCommentSubmit = (e: React.FormEvent) => {
+  const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim() || !profile) return;
+    if (!profile || !newComment.trim()) return;
 
-    const comment: Comment = {
-      id: Date.now().toString(),
-      content: newComment,
-      author: {
-        id: profile.id,
-        name: profile.name,
-        avatar: profile.avatar
-      },
-      likes: 0,
-      replies: [],
-      createdAt: new Date()
-    };
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          content: newComment,
+          video_id: videoId,
+          user_id: profile.id
+        })
+        .select(`
+          *,
+          profiles!comments_user_id_fkey (
+            name,
+            avatar
+          )
+        `)
+        .single();
 
-    setComments(prev => [comment, ...prev]);
-    setNewComment('');
+      if (error) throw error;
 
-    // Send notification
-    addNotification({
-      type: 'comment',
-      message: `${profile.name} commented on a video`,
-      read: false
-    });
-  };
+      const newCommentWithUser = {
+        ...data,
+        user: {
+          name: data.profiles?.name || 'Unknown User',
+          avatar: data.profiles?.avatar
+        }
+      };
 
-  const handleReplySubmit = (parentId: string) => {
-    if (!replyContent.trim() || !profile) return;
+      setComments(prev => [newCommentWithUser, ...prev]);
+      setNewComment('');
 
-    const reply: Comment = {
-      id: Date.now().toString(),
-      content: replyContent,
-      author: {
-        id: profile.id,
-        name: profile.name,
-        avatar: profile.avatar
-      },
-      likes: 0,
-      replies: [],
-      createdAt: new Date()
-    };
-
-    setComments(prev => prev.map(comment => 
-      comment.id === parentId 
-        ? { ...comment, replies: [...comment.replies, reply] }
-        : comment
-    ));
-
-    setReplyContent('');
-    setReplyingTo(null);
-  };
-
-  const handleLike = (commentId: string, isReply: boolean = false, parentId?: string) => {
-    if (isReply && parentId) {
-      setComments(prev => prev.map(comment => 
-        comment.id === parentId 
-          ? {
-              ...comment,
-              replies: comment.replies.map(reply =>
-                reply.id === commentId
-                  ? { ...reply, liked: !reply.liked, likes: reply.liked ? reply.likes - 1 : reply.likes + 1 }
-                  : reply
-              )
-            }
-          : comment
-      ));
-    } else {
-      setComments(prev => prev.map(comment => 
-        comment.id === commentId 
-          ? { ...comment, liked: !comment.liked, likes: comment.liked ? comment.likes - 1 : comment.likes + 1 }
-          : comment
-      ));
+      // Notify video creator about new comment
+      if (videoCreatorId !== profile.id) {
+        await addNotification({
+          user_id: videoCreatorId,
+          type: 'comment',
+          title: 'New Comment',
+          content: `${profile.name} commented on your video "${videoTitle}"`,
+          video_id: videoId
+        });
+      }
+    } catch (error) {
+      console.error('Error posting comment:', error);
     }
   };
 
-  const CommentItem: React.FC<{ comment: Comment; isReply?: boolean; parentId?: string }> = ({ 
-    comment, 
-    isReply = false, 
-    parentId 
-  }) => (
-    <div className={`${isReply ? 'ml-12' : ''} space-y-3`}>
-      <div className="flex space-x-3">
-        <img
-          src={comment.author.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
-          alt={comment.author.name}
-          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-        />
-        
-        <div className="flex-1 space-y-2">
-          <div className="bg-gray-800/30 rounded-xl p-3">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="font-medium text-white text-sm">{comment.author.name}</span>
-              <span className="text-xs text-gray-400">
-                {new Date(comment.createdAt).toLocaleDateString()}
-              </span>
-            </div>
-            <p className="text-gray-300 text-sm leading-relaxed">{comment.content}</p>
-          </div>
+  const handleSubmitReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile || !replyTo || !replyContent.trim()) return;
 
-          <div className="flex items-center space-x-4 text-xs text-gray-400">
-            <button
-              onClick={() => handleLike(comment.id, isReply, parentId)}
-              className={`flex items-center space-x-1 hover:text-red-400 transition-colors ${
-                comment.liked ? 'text-red-400' : ''
-              }`}
-            >
-              <Heart size={12} fill={comment.liked ? 'currentColor' : 'none'} />
-              <span>{comment.likes}</span>
-            </button>
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .insert({
+          content: replyContent,
+          video_id: videoId,
+          user_id: profile.id,
+          parent_id: replyTo
+        })
+        .select(`
+          *,
+          profiles!comments_user_id_fkey (
+            name,
+            avatar
+          )
+        `)
+        .single();
 
-            {!isReply && (
-              <button
-                onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                className="flex items-center space-x-1 hover:text-blue-400 transition-colors"
-              >
-                <MessageCircle size={12} />
-                <span>Reply</span>
-              </button>
-            )}
-          </div>
+      if (error) throw error;
 
-          {/* Reply Form */}
-          {replyingTo === comment.id && (
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleReplySubmit(comment.id);
-              }}
-              className="mt-3"
-            >
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="Write a reply..."
-                  className="input-field flex-1 text-sm py-2"
-                />
-                <button
-                  type="submit"
-                  disabled={!replyContent.trim()}
-                  className="btn-primary text-sm px-4 py-2 disabled:opacity-50"
-                >
-                  Reply
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
+      const newReply = {
+        ...data,
+        user: {
+          name: data.profiles?.name || 'Unknown User',
+          avatar: data.profiles?.avatar
+        }
+      };
 
-      {/* Replies */}
-      {comment.replies.length > 0 && (
-        <div className="space-y-3">
-          {comment.replies.map((reply) => (
-            <CommentItem 
-              key={reply.id} 
-              comment={reply} 
-              isReply={true} 
-              parentId={comment.id} 
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+      // Update the comments state to include the new reply
+      setComments(prevComments => {
+        return prevComments.map(comment => {
+          if (comment.id === replyTo) {
+            const updatedReplies = comment.replies ? [...comment.replies, newReply] : [newReply];
+            return { ...comment, replies: updatedReplies };
+          }
+          return comment;
+        });
+      });
+
+      setReplyTo(null);
+      setReplyContent('');
+
+      // Optionally, notify the parent comment's author
+      const parentComment = comments.find(c => c.id === replyTo);
+      if (parentComment && parentComment.user_id !== profile.id) {
+        await addNotification({
+          user_id: parentComment.user_id,
+          type: 'comment',
+          title: 'New Reply',
+          content: `${profile.name} replied to your comment on "${videoTitle}"`,
+          video_id: videoId
+        });
+      }
+    } catch (error) {
+      console.error('Error posting reply:', error);
+    }
+  };
+
+  const handleLike = async (commentId: string) => {
+    if (!profile) return;
+
+    try {
+      // Optimistically update the local state
+      setComments(prevComments =>
+        prevComments.map(comment =>
+          comment.id === commentId
+            ? { ...comment, likes: comment.likes + 1 }
+            : comment
+        )
+      );
+
+      // Update the like count in the database
+      const { error } = await supabase
+        .from('comments')
+        .update({ likes: () => 'likes + 1' })
+        .eq('id', commentId);
+
+      if (error) {
+        console.error('Error liking comment:', error);
+        // Revert the optimistic update if the database update fails
+        setComments(prevComments =>
+          prevComments.map(comment =>
+            comment.id === commentId
+              ? { ...comment, likes: comment.likes - 1 }
+              : comment
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error liking comment:', error);
+    }
+  };
+
+  const handleDislike = async (commentId: string) => {
+    if (!profile) return;
+
+    try {
+      // Optimistically update the local state
+      setComments(prevComments =>
+        prevComments.map(comment =>
+          comment.id === commentId
+            ? { ...comment, dislikes: comment.dislikes + 1 }
+            : comment
+        )
+      );
+
+      // Update the dislike count in the database
+      const { error } = await supabase
+        .from('comments')
+        .update({ dislikes: () => 'dislikes + 1' })
+        .eq('id', commentId);
+
+      if (error) {
+        console.error('Error disliking comment:', error);
+        // Revert the optimistic update if the database update fails
+        setComments(prevComments =>
+          prevComments.map(comment =>
+            comment.id === commentId
+              ? { ...comment, dislikes: comment.dislikes - 1 }
+              : comment
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error disliking comment:', error);
+    }
+  };
 
   return (
-    <div className="rounded-card p-6">
-      <h3 className="text-xl font-bold text-white mb-6">
+    <div className="mt-8 space-y-6">
+      <h3 className="text-xl font-semibold text-white mb-4">
         Comments ({comments.length})
       </h3>
 
-      {/* Comment Form */}
-      {profile ? (
-        <form onSubmit={handleCommentSubmit} className="mb-8">
+      {profile && (
+        <form onSubmit={handleSubmitComment} className="space-y-4">
           <div className="flex space-x-3">
             <img
-              src={profile.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
+              src={profile.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
               alt={profile.name}
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+              className="w-10 h-10 rounded-full object-cover"
             />
-            <div className="flex-1 space-y-3">
+            <div className="flex-1">
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment..."
-                className="input-field w-full h-20 resize-none"
+                className="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                rows={3}
               />
-              <div className="flex justify-end">
+              <div className="flex justify-end mt-2">
                 <button
                   type="submit"
                   disabled={!newComment.trim()}
-                  className="btn-primary disabled:opacity-50"
+                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Comment
                 </button>
@@ -242,22 +287,120 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId }) => {
             </div>
           </div>
         </form>
-      ) : (
-        <div className="text-center py-8 text-gray-400">
-          <p>Please log in to leave a comment</p>
-        </div>
       )}
 
-      {/* Comments List */}
-      <div className="space-y-6">
-        {comments.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No comments yet. Be the first to comment!</p>
+      <div className="space-y-4">
+        {isLoading ? (
+          <div className="text-center text-gray-400 py-8">Loading comments...</div>
+        ) : comments.length === 0 ? (
+          <div className="text-center text-gray-400 py-8">
+            No comments yet. Be the first to comment!
           </div>
         ) : (
           comments.map((comment) => (
-            <CommentItem key={comment.id} comment={comment} />
+            <div key={comment.id} className="bg-gray-800/30 rounded-lg p-4">
+              <div className="flex items-start space-x-3">
+                <img
+                  src={comment.user?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
+                  alt={comment.user?.name || 'User'}
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="font-medium text-white text-sm">
+                      {comment.user?.name || 'Unknown User'}
+                    </span>
+                    <span className="text-gray-400 text-xs">
+                      {new Date(comment.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-gray-300 text-sm mb-3">{comment.content}</p>
+                  
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => handleLike(comment.id)}
+                      className="flex items-center space-x-1 text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <Heart size={16} />
+                      <span className="text-xs">{comment.likes}</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => setReplyTo(comment.id)}
+                      className="flex items-center space-x-1 text-gray-400 hover:text-blue-400 transition-colors"
+                    >
+                      <Reply size={16} />
+                      <span className="text-xs">Reply</span>
+                    </button>
+                  </div>
+
+                  {replyTo === comment.id && profile && (
+                    <form onSubmit={handleSubmitReply} className="mt-3 ml-4">
+                      <div className="flex space-x-2">
+                        <img
+                          src={profile.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
+                          alt={profile.name}
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                        <div className="flex-1">
+                          <textarea
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                            placeholder="Write a reply..."
+                            className="w-full bg-gray-700/50 border border-gray-600/50 rounded px-3 py-2 text-white placeholder-gray-400 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            rows={2}
+                          />
+                          <div className="flex justify-end space-x-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplyTo(null);
+                                setReplyContent('');
+                              }}
+                              className="text-xs text-gray-400 hover:text-white px-2 py-1"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={!replyContent.trim()}
+                              className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              Reply
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+
+                  {comment.replies && comment.replies.length > 0 && (
+                    <div className="ml-6 mt-3 space-y-3">
+                      {comment.replies.map((reply) => (
+                        <div key={reply.id} className="flex items-start space-x-2">
+                          <img
+                            src={reply.user?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
+                            alt={reply.user?.name || 'User'}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <span className="font-medium text-white text-xs">
+                                {reply.user?.name || 'Unknown User'}
+                              </span>
+                              <span className="text-gray-400 text-xs">
+                                {new Date(reply.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-gray-300 text-xs">{reply.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           ))
         )}
       </div>
