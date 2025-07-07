@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -20,7 +20,76 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const { login, signup } = useAuth();
+
+  // Check for password recovery on component mount
+  useEffect(() => {
+    const checkPasswordRecovery = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      // Check if there's a password recovery session
+      if (session && !error) {
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = urlParams.get('access_token');
+        const type = urlParams.get('type');
+        
+        if (type === 'recovery' && accessToken) {
+          setShowPasswordReset(true);
+          // Clear the URL hash
+          window.location.hash = '';
+        }
+      }
+    };
+    
+    if (isOpen) {
+      checkPasswordRecovery();
+    }
+  }, [isOpen]);
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill in both password fields');
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) {
+        toast.error(error.message || 'Failed to reset password');
+      } else {
+        toast.success('Password reset successfully! You can now sign in with your new password.');
+        setShowPasswordReset(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        onClose();
+      }
+    } catch (error) {
+      console.error('Password reset completion error:', error);
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +117,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setEmail('');
           setPassword('');
           setName('');
-          setShowEmailConfirmation(false);
+          setShowForgotPassword(false);
+          setResetEmailSent(false);
+          setShowPasswordReset(false);
+          setNewPassword('');
+          setConfirmPassword('');
         } else {
           console.error('Login error:', error);
           if (error.message?.includes('Invalid login credentials')) {
@@ -336,6 +409,65 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Password Reset Completion Modal */}
+          <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${showPasswordReset ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'}`}>
+            <div className="bg-gray-900/95 rounded-card p-6 h-full">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-white mb-2">Set New Password</h2>
+                <p className="text-gray-400">
+                  Please enter your new password below
+                </p>
+              </div>
+
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="input-field w-full pr-12"
+                      placeholder="Enter new password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Updating...' : 'Update Password'}
+                </button>
+              </form>
             </div>
           </div>
         </div>
