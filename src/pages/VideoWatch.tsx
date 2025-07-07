@@ -71,7 +71,20 @@ const VideoWatch = () => {
   const incrementViews = async () => {
     try {
       if (id) {
-        await supabase.rpc('increment_video_views', { video_id: id });
+        // Get current video to increment views
+        const { data: currentVideo } = await supabase
+          .from('videos')
+          .select('views')
+          .eq('id', id)
+          .single();
+
+        if (currentVideo) {
+          const newViews = (currentVideo.views || 0) + 1;
+          await supabase
+            .from('videos')
+            .update({ views: newViews })
+            .eq('id', id);
+        }
       }
     } catch (error) {
       console.error('Error incrementing views:', error);
