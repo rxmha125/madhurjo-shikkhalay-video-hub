@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pencil, Upload as UploadIcon, Clock, Trash2, Users } from 'lucide-react';
+import { Pencil, Upload as UploadIcon, Clock, Trash2, Users, Edit, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useFollowSystem } from '../hooks/useFollowSystem';
 import VideoCard from '../components/VideoCard';
@@ -33,9 +33,16 @@ const Profile = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [removingVideos, setRemovingVideos] = useState<string[]>([]);
   const [deletingVideos, setDeletingVideos] = useState<string[]>([]);
+  const [editingVideo, setEditingVideo] = useState<string | null>(null);
+  const [updatingVideo, setUpdatingVideo] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     description: ''
+  });
+  const [videoEditForm, setVideoEditForm] = useState({
+    title: '',
+    description: '',
+    thumbnail: ''
   });
 
   const isOwnProfile = profile?.id === id;
@@ -342,6 +349,72 @@ const Profile = () => {
     }
   };
 
+  const handleEditVideo = (video: Video) => {
+    setVideoEditForm({
+      title: video.title,
+      description: '', // We'll need to fetch full video data for description
+      thumbnail: video.thumbnail
+    });
+    setEditingVideo(video.id);
+    
+    // Fetch full video data including description
+    fetchVideoForEdit(video.id);
+  };
+
+  const fetchVideoForEdit = async (videoId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('id', videoId)
+        .single();
+
+      if (error) throw error;
+      
+      setVideoEditForm({
+        title: data.title,
+        description: data.description || '',
+        thumbnail: data.thumbnail || ''
+      });
+    } catch (error) {
+      console.error('Error fetching video for edit:', error);
+    }
+  };
+
+  const handleUpdateVideo = async () => {
+    if (!editingVideo) return;
+
+    setUpdatingVideo(true);
+
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .update({
+          title: videoEditForm.title,
+          description: videoEditForm.description,
+          thumbnail: videoEditForm.thumbnail
+        })
+        .eq('id', editingVideo);
+
+      if (error) throw error;
+
+      // Update local state
+      setVideos(prev => prev.map(video => 
+        video.id === editingVideo 
+          ? { ...video, title: videoEditForm.title, thumbnail: videoEditForm.thumbnail }
+          : video
+      ));
+
+      setEditingVideo(null);
+      toast.success('Video updated successfully!');
+    } catch (error) {
+      console.error('Error updating video:', error);
+      toast.error('Failed to update video');
+    } finally {
+      setUpdatingVideo(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
@@ -390,14 +463,42 @@ const Profile = () => {
 
             <div className="flex-1 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start space-x-3 mb-4">
-                <h1 className="text-3xl font-bold text-white">{profileUser?.name}</h1>
-                {isOwnProfile && (
-                  <button
-                    onClick={() => setEditing(true)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <Pencil size={20} />
-                  </button>
+                {editing ? (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="bg-gray-700 text-white px-3 py-1 rounded text-3xl font-bold border border-gray-600 focus:border-blue-500 focus:outline-none"
+                      placeholder="Name"
+                    />
+                    <button
+                      onClick={handleSaveProfile}
+                      className="text-green-400 hover:text-green-300 transition-colors"
+                      title="Save"
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={() => setEditing(false)}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <h1 className="text-3xl font-bold text-white">{profileUser?.name}</h1>
+                    {isOwnProfile && (
+                      <button
+                        onClick={() => setEditing(true)}
+                        className="text-gray-400 hover:text-white transition-colors"
+                      >
+                        <Pencil size={20} />
+                      </button>
+                    )}
+                  </>
                 )}
                 {!isOwnProfile && profile && (
                   <button
@@ -415,9 +516,19 @@ const Profile = () => {
                 )}
               </div>
               
-              <p className="text-gray-400 leading-relaxed max-w-2xl mb-6">
-                {profileUser?.description || 'No description provided.'}
-              </p>
+              {editing ? (
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full bg-gray-700 text-gray-300 px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"
+                  placeholder="Description"
+                  rows={3}
+                />
+              ) : (
+                <p className="text-gray-400 leading-relaxed max-w-2xl mb-6">
+                  {profileUser?.description || 'No description provided.'}
+                </p>
+              )}
 
               <div className="flex justify-center md:justify-start space-x-8">
                 <div className="text-center">
@@ -481,7 +592,14 @@ const Profile = () => {
                     <div key={video.id} className="relative group">
                       <VideoCard video={video} />
                       {isOwnProfile && (
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <button
+                            onClick={() => handleEditVideo(video)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors shadow-lg"
+                            title="Edit video"
+                          >
+                            <Edit size={16} />
+                          </button>
                           <button
                             onClick={() => handleDeleteVideo(video.id)}
                             disabled={deletingVideos.includes(video.id)}
@@ -543,6 +661,84 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* Video Edit Modal */}
+      {editingVideo && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-white">Edit Video</h3>
+              <button
+                onClick={() => setEditingVideo(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={videoEditForm.title}
+                  onChange={(e) => setVideoEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                  placeholder="Video title"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={videoEditForm.description}
+                  onChange={(e) => setVideoEditForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"
+                  placeholder="Video description"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Thumbnail URL
+                </label>
+                <input
+                  type="url"
+                  value={videoEditForm.thumbnail}
+                  onChange={(e) => setVideoEditForm(prev => ({ ...prev, thumbnail: e.target.value }))}
+                  className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+                  placeholder="Thumbnail URL"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={handleUpdateVideo}
+                  disabled={updatingVideo}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-4 py-2 rounded-lg transition-colors flex items-center justify-center"
+                >
+                  {updatingVideo ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    'Update Video'
+                  )}
+                </button>
+                <button
+                  onClick={() => setEditingVideo(null)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
