@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Heart, Share2, Eye, Calendar, User } from 'lucide-react';
@@ -71,7 +70,9 @@ const VideoWatch = () => {
 
   const incrementViews = async () => {
     try {
-      await supabase.rpc('increment_video_views', { video_id: id });
+      if (id) {
+        await supabase.rpc('increment_video_views', { video_id: id });
+      }
     } catch (error) {
       console.error('Error incrementing views:', error);
     }

@@ -187,11 +187,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
     if (!profile) return;
 
     try {
+      // Get current comment to increment likes
+      const currentComment = comments.find(c => c.id === commentId);
+      if (!currentComment) return;
+
+      const newLikes = currentComment.likes + 1;
+
       // Optimistically update the local state
       setComments(prevComments =>
         prevComments.map(comment =>
           comment.id === commentId
-            ? { ...comment, likes: comment.likes + 1 }
+            ? { ...comment, likes: newLikes }
             : comment
         )
       );
@@ -199,7 +205,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
       // Update the like count in the database
       const { error } = await supabase
         .from('comments')
-        .update({ likes: () => 'likes + 1' })
+        .update({ likes: newLikes })
         .eq('id', commentId);
 
       if (error) {
@@ -208,7 +214,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
         setComments(prevComments =>
           prevComments.map(comment =>
             comment.id === commentId
-              ? { ...comment, likes: comment.likes - 1 }
+              ? { ...comment, likes: currentComment.likes }
               : comment
           )
         );
@@ -222,11 +228,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
     if (!profile) return;
 
     try {
+      // Get current comment to increment dislikes
+      const currentComment = comments.find(c => c.id === commentId);
+      if (!currentComment) return;
+
+      const newDislikes = currentComment.dislikes + 1;
+
       // Optimistically update the local state
       setComments(prevComments =>
         prevComments.map(comment =>
           comment.id === commentId
-            ? { ...comment, dislikes: comment.dislikes + 1 }
+            ? { ...comment, dislikes: newDislikes }
             : comment
         )
       );
@@ -234,7 +246,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
       // Update the dislike count in the database
       const { error } = await supabase
         .from('comments')
-        .update({ dislikes: () => 'dislikes + 1' })
+        .update({ dislikes: newDislikes })
         .eq('id', commentId);
 
       if (error) {
@@ -243,7 +255,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
         setComments(prevComments =>
           prevComments.map(comment =>
             comment.id === commentId
-              ? { ...comment, dislikes: comment.dislikes - 1 }
+              ? { ...comment, dislikes: currentComment.dislikes }
               : comment
           )
         );
