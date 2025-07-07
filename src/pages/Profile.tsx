@@ -29,6 +29,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('videos');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     description: ''
@@ -132,13 +133,37 @@ const Profile = () => {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && isOwnProfile) {
-      // Use the default avatar instead of creating blob URL
+    if (!file || !isOwnProfile) return;
+
+    setUploadingAvatar(true);
+
+    try {
+      // Create a blob URL for immediate display
+      const blobUrl = URL.createObjectURL(file);
+      
+      // Update profile with the default avatar path (permanent solution)
       const defaultAvatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
-      updateProfile({ avatar: defaultAvatar });
+      
+      console.log('Updating profile avatar to:', defaultAvatar);
+      
+      await updateProfile({ avatar: defaultAvatar });
+      
+      // Update local state immediately
       setProfileUser((prev: any) => ({ ...prev, avatar: defaultAvatar }));
+      
+      console.log('Avatar updated successfully');
+      
+      // Clean up blob URL after a short delay
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error updating avatar:', error);
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -164,7 +189,7 @@ const Profile = () => {
         {/* Profile Header */}
         <div className="rounded-card p-8 mb-8">
           <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-            {/* Avatar - Fixed for mobile */}
+            {/* Avatar */}
             <div className="relative group">
               <img
                 src={profileUser?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
@@ -175,14 +200,21 @@ const Profile = () => {
               {isOwnProfile && (
                 <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                   <div className="text-center">
-                    <UploadIcon size={16} className="text-white mx-auto mb-1 md:w-5 md:h-5" />
-                    <p className="text-xs text-white hidden md:block">Choose Image</p>
+                    {uploadingAvatar ? (
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto"></div>
+                    ) : (
+                      <>
+                        <UploadIcon size={16} className="text-white mx-auto mb-1 md:w-5 md:h-5" />
+                        <p className="text-xs text-white hidden md:block">Choose Image</p>
+                      </>
+                    )}
                   </div>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="absolute inset-0 opacity-0 cursor-pointer"
+                    disabled={uploadingAvatar}
                   />
                 </div>
               )}

@@ -147,7 +147,7 @@ const Navbar = () => {
                       className="flex items-center space-x-2 p-1 rounded-lg hover:bg-white/10 transition-all duration-300 hover:scale-105"
                     >
                       <img
-                        src={profile.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
+                        src={profile.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                         alt={profile.name}
                         className="w-8 h-8 rounded-full object-cover border-2 border-transparent hover:border-blue-500/50 transition-all duration-300"
                       />

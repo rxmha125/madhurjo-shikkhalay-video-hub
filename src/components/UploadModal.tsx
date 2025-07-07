@@ -60,20 +60,27 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
         return;
       }
 
+      console.log('Video created:', videoData);
+      console.log('Current user profile:', profile);
+
       if (profile.is_admin) {
         toast.success('Video uploaded successfully!');
         setStep(4);
       } else {
-        // Get admin profile to send notification
+        // Find admin user by email
+        console.log('Looking for admin with email: mamadhurjo.shikkhalay@gmail.com');
         const { data: adminProfile, error: adminError } = await supabase
           .from('profiles')
           .select('*')
+          .eq('email', 'mamadhurjo.shikkhalay@gmail.com')
           .eq('is_admin', true)
           .single();
 
+        console.log('Admin query result:', { adminProfile, adminError });
+
         if (!adminError && adminProfile) {
           // Create notification in database
-          const { error: notifError } = await supabase
+          const { data: notificationData, error: notifError } = await supabase
             .from('notifications')
             .insert({
               user_id: adminProfile.id,
@@ -81,23 +88,31 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
               title: 'New Video Review Request',
               content: `New video "${formData.title}" needs approval from ${profile.name}`,
               video_id: videoData.id
-            });
+            })
+            .select()
+            .single();
+
+          console.log('Notification creation result:', { notificationData, notifError });
 
           if (notifError) {
             console.error('Error creating notification:', notifError);
+          } else {
+            console.log('Notification created successfully:', notificationData);
+            
+            // Also add to local notification context for real-time updates
+            addNotification({
+              type: 'upload_review',
+              message: `New video "${formData.title}" needs approval from ${profile.name}`,
+              read: false,
+              data: {
+                videoTitle: formData.title,
+                uploaderName: profile.name,
+                thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null
+              }
+            });
           }
-
-          // Also add to local notification context for real-time updates
-          addNotification({
-            type: 'upload_review',
-            message: `New video "${formData.title}" needs approval`,
-            read: false,
-            data: {
-              videoTitle: formData.title,
-              uploaderName: profile.name,
-              thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null
-            }
-          });
+        } else {
+          console.error('Admin not found or error:', { adminError, adminProfile });
         }
 
         toast.success('Video uploaded for review!');
@@ -367,7 +382,11 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                   <button
                     onClick={handleSubmit}
                     disabled={uploading}
-                    className="btn-primary disabled:opacity-50"
+                    className={`font-medium px-6 py-2 rounded-lg transition-colors ${
+                      uploading 
+                        ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
                   >
                     {uploading ? 'Sending...' : 'Send'}
                   </button>

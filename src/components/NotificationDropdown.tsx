@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Check, Clock, Heart, MessageCircle, Upload } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -35,7 +36,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   };
 
   return (
-    <div className="absolute top-12 right-0 w-80 max-w-[calc(100vw-2rem)] md:w-80 rounded-card shadow-xl z-50 max-h-96 overflow-hidden">
+    <div className="absolute top-12 right-0 w-80 max-w-[calc(100vw-1rem)] rounded-card shadow-xl z-50 max-h-96 overflow-hidden">
       <div className="p-4 border-b border-gray-700">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-white">Notifications</h3>
