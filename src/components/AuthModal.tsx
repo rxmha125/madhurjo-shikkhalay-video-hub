@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showEmailConfirmation, setShowEmailConfirmation] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const { login, signup } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,11 +82,43 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl
+      });
+
+      if (error) {
+        toast.error(error.message || 'Failed to send reset email');
+      } else {
+        setResetEmailSent(true);
+        toast.success('Password reset email sent! Check your inbox.');
+      }
+    } catch (error) {
+      console.error('Password reset error:', error);
+      toast.error('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const resetForm = () => {
     setEmail('');
     setPassword('');
     setName('');
     setShowEmailConfirmation(false);
+    setShowForgotPassword(false);
+    setResetEmailSent(false);
     setShowPassword(false);
   };
 
@@ -177,6 +212,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
+              {isLogin && (
+                <div className="text-right mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -218,6 +265,77 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               >
                 Got it!
               </button>
+            </div>
+          </div>
+
+          {/* Forgot Password Modal */}
+          <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${showForgotPassword ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'}`}>
+            <div className="bg-gray-900/95 rounded-card p-6 h-full">
+              {!resetEmailSent ? (
+                <>
+                  <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-white mb-2">Reset Password</h2>
+                    <p className="text-gray-400">
+                      Enter your email address and we'll send you a reset link
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="input-field w-full"
+                        placeholder="Enter your email"
+                        required
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? 'Sending...' : 'Send Reset Link'}
+                    </button>
+                  </form>
+
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={() => setShowForgotPassword(false)}
+                      className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mb-4">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Reset Link Sent!</h3>
+                  <p className="text-gray-400 mb-6">
+                    We've sent a password reset link to <span className="text-blue-400">{email}</span>. 
+                    Check your email and follow the instructions to reset your password.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setResetEmailSent(false);
+                    }}
+                    className="btn-secondary"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

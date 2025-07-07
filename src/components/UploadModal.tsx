@@ -339,14 +339,14 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-[600px] mx-auto bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-4">
-          <DialogTitle className="text-white text-lg sm:text-xl text-center">Upload Video</DialogTitle>
+      <DialogContent className="w-[95vw] max-w-[500px] mx-auto bg-gray-900 border-gray-700 max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="pb-2 sm:pb-4">
+          <DialogTitle className="text-white text-base sm:text-xl text-center">Upload Video</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-3 sm:space-y-6">
           {/* Step Indicator */}
-          <div className="flex justify-center items-center px-2">
+          <div className="flex justify-center items-center">
             {[1, 2, 3, 4].map((step) => (
               <StepIndicator
                 key={step}
@@ -358,12 +358,12 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           {/* Step Content */}
-          <div className="min-h-[200px] px-2 sm:px-0">
+          <div className="min-h-[180px] sm:min-h-[200px]">
             {renderStep()}
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0 pt-4 px-2 sm:px-0">
+          <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-2 sm:gap-0 pt-2 sm:pt-4">
             <Button
               type="button"
               onClick={prevStep}
