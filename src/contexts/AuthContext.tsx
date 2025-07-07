@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
@@ -168,6 +167,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || !profile) return;
     
     console.log('Updating profile:', updates);
+    
+    // If updating avatar and it's a blob URL, use the default avatar instead
+    if (updates.avatar && updates.avatar.startsWith('blob:')) {
+      updates.avatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+    }
+    
     const { error } = await supabase
       .from('profiles')
       .update(updates)
@@ -175,6 +180,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!error) {
       setProfile({ ...profile, ...updates });
+    } else {
+      console.error('Error updating profile:', error);
     }
   };
 

@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { X, Upload, Check, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface UploadModalProps {
@@ -20,6 +20,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
     visibility: 'public' as 'public' | 'private' | 'scheduled'
   });
   const [uploading, setUploading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const { profile } = useAuth();
   const { addNotification } = useNotifications();
 
@@ -31,7 +32,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.title || !formData.video) {
+    if (!formData.title || !formData.video || !profile) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -39,29 +40,72 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
     setUploading(true);
 
     try {
-      // Simulate upload process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Insert video into database
+      const { data: videoData, error: videoError } = await supabase
+        .from('videos')
+        .insert({
+          title: formData.title,
+          description: formData.description,
+          creator_id: profile.id,
+          thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null,
+          visibility: formData.visibility,
+          is_approved: profile.is_admin
+        })
+        .select()
+        .single();
 
-      if (profile?.is_admin) {
+      if (videoError) {
+        console.error('Error creating video:', videoError);
+        toast.error('Failed to upload video');
+        return;
+      }
+
+      if (profile.is_admin) {
         toast.success('Video uploaded successfully!');
         setStep(4);
       } else {
-        // Send notification to admin for approval
-        addNotification({
-          type: 'upload_review',
-          message: `New video "${formData.title}" needs approval`,
-          read: false,
-          data: {
-            videoTitle: formData.title,
-            uploaderName: profile?.name,
-            thumbnail: formData.thumbnail ? URL.createObjectURL(formData.thumbnail) : null
+        // Get admin profile to send notification
+        const { data: adminProfile, error: adminError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('is_admin', true)
+          .single();
+
+        if (!adminError && adminProfile) {
+          // Create notification in database
+          const { error: notifError } = await supabase
+            .from('notifications')
+            .insert({
+              user_id: adminProfile.id,
+              type: 'upload_review',
+              title: 'New Video Review Request',
+              content: `New video "${formData.title}" needs approval from ${profile.name}`,
+              video_id: videoData.id
+            });
+
+          if (notifError) {
+            console.error('Error creating notification:', notifError);
           }
-        });
+
+          // Also add to local notification context for real-time updates
+          addNotification({
+            type: 'upload_review',
+            message: `New video "${formData.title}" needs approval`,
+            read: false,
+            data: {
+              videoTitle: formData.title,
+              uploaderName: profile.name,
+              thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null
+            }
+          });
+        }
 
         toast.success('Video uploaded for review!');
+        setSubmitted(true);
         setStep(4);
       }
     } catch (error) {
+      console.error('Upload error:', error);
       toast.error('Upload failed. Please try again.');
     } finally {
       setUploading(false);
@@ -70,6 +114,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
 
   const resetModal = () => {
     setStep(1);
+    setSubmitted(false);
     setFormData({
       title: '',
       description: '',
@@ -287,7 +332,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check size={32} className="text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-4">You are the admin</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">Video Published!</h2>
                 <p className="text-gray-400 mb-6">
                   Your video has been uploaded and is now live on the platform.
                 </p>
@@ -303,17 +348,30 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                 <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Clock size={32} className="text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-4">Pending Approval</h2>
+                <h2 className="text-2xl font-bold text-white mb-4">
+                  {submitted ? 'Submitted for Review!' : 'Pending Approval'}
+                </h2>
                 <p className="text-gray-400 mb-6">
-                  Needs approval from Harez Uddin Hero before it goes live.
+                  {submitted 
+                    ? 'Your video has been submitted and the admin has been notified.' 
+                    : 'Needs approval from admin before it goes live.'}
                 </p>
-                <button
-                  onClick={handleSubmit}
-                  disabled={uploading}
-                  className="btn-primary disabled:opacity-50"
-                >
-                  {uploading ? 'Sending...' : 'Send'}
-                </button>
+                {submitted ? (
+                  <button
+                    onClick={resetModal}
+                    className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-lg transition-colors"
+                  >
+                    Done
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={uploading}
+                    className="btn-primary disabled:opacity-50"
+                  >
+                    {uploading ? 'Sending...' : 'Send'}
+                  </button>
+                )}
               </div>
             )}
           </div>

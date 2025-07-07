@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Check, Clock, Heart, MessageCircle, Upload } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -36,7 +35,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   };
 
   return (
-    <div className="absolute top-12 right-0 w-80 rounded-card shadow-xl z-50 max-h-96 overflow-hidden">
+    <div className="absolute top-12 right-0 w-80 max-w-[calc(100vw-2rem)] md:w-80 rounded-card shadow-xl z-50 max-h-96 overflow-hidden">
       <div className="p-4 border-b border-gray-700">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-white">Notifications</h3>
@@ -72,7 +71,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white">
+                  <p className="text-sm text-white break-words">
                     {notification.message}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
@@ -81,7 +80,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
 
                   {/* Admin Review Actions */}
                   {notification.type === 'upload_review' && profile?.is_admin && !notification.read && (
-                    <div className="flex items-center space-x-2 mt-3">
+                    <div className="flex flex-col space-y-2 mt-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
                       {notification.data?.thumbnail && (
                         <img
                           src={notification.data.thumbnail}

@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pencil, Upload as UploadIcon } from 'lucide-react';
+import { Pencil, Upload as UploadIcon, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import InfiniteScroll from 'react-infinite-scroll-component';
 import VideoCard from '../components/VideoCard';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Video {
   id: string;
@@ -24,9 +24,11 @@ const Profile = () => {
   const { profile, updateProfile } = useAuth();
   const [profileUser, setProfileUser] = useState<any>(null);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [pendingVideos, setPendingVideos] = useState<Video[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState('videos');
   const [editForm, setEditForm] = useState({
     name: '',
     description: ''
@@ -37,10 +39,12 @@ const Profile = () => {
   useEffect(() => {
     loadProfile();
     loadUserVideos();
+    if (isOwnProfile) {
+      loadPendingVideos();
+    }
   }, [id]);
 
   const loadProfile = () => {
-    // In real app, this would fetch from Supabase
     if (isOwnProfile && profile) {
       setProfileUser(profile);
       setEditForm({
@@ -48,30 +52,93 @@ const Profile = () => {
         description: profile.description || ''
       });
     } else {
-      // Simulate loading another user's profile
       setProfileUser({
         id: id,
         name: 'Student User',
-        avatar: '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png',
+        avatar: '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
         description: 'Eager to learn and grow through quality education.'
       });
     }
     setLoading(false);
   };
 
-  const loadUserVideos = () => {
-    // Load videos uploaded by this user
-    // In real app, this would fetch from Supabase with user filter
-    setVideos([]);
-    setHasMore(false);
+  const loadUserVideos = async () => {
+    if (!profile) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*, creator:profiles!videos_creator_id_fkey(id, name, avatar)')
+        .eq('creator_id', profile.id)
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading videos:', error);
+        return;
+      }
+
+      const formattedVideos = data?.map(video => ({
+        id: video.id,
+        title: video.title,
+        thumbnail: video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
+        views: video.views || 0,
+        created_at: video.created_at,
+        creator: {
+          id: video.creator?.id || '',
+          name: video.creator?.name || 'Unknown',
+          avatar: video.creator?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'
+        }
+      })) || [];
+
+      setVideos(formattedVideos);
+    } catch (error) {
+      console.error('Error loading videos:', error);
+    }
+  };
+
+  const loadPendingVideos = async () => {
+    if (!profile) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*, creator:profiles!videos_creator_id_fkey(id, name, avatar)')
+        .eq('creator_id', profile.id)
+        .eq('is_approved', false)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading pending videos:', error);
+        return;
+      }
+
+      const formattedVideos = data?.map(video => ({
+        id: video.id,
+        title: video.title,
+        thumbnail: video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
+        views: video.views || 0,
+        created_at: video.created_at,
+        creator: {
+          id: video.creator?.id || '',
+          name: video.creator?.name || 'Unknown',
+          avatar: video.creator?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'
+        }
+      })) || [];
+
+      setPendingVideos(formattedVideos);
+    } catch (error) {
+      console.error('Error loading pending videos:', error);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && isOwnProfile) {
-      const imageUrl = URL.createObjectURL(file);
-      updateProfile({ avatar: imageUrl });
-      setProfileUser((prev: any) => ({ ...prev, avatar: imageUrl }));
+      // Use the default avatar instead of creating blob URL
+      const defaultAvatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+      updateProfile({ avatar: defaultAvatar });
+      setProfileUser((prev: any) => ({ ...prev, avatar: defaultAvatar }));
     }
   };
 
@@ -97,19 +164,19 @@ const Profile = () => {
         {/* Profile Header */}
         <div className="rounded-card p-8 mb-8">
           <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-            {/* Avatar */}
+            {/* Avatar - Fixed for mobile */}
             <div className="relative group">
               <img
-                src={profileUser?.avatar || '/lovable-uploads/824dd225-357b-421b-af65-b70d6610c554.png'}
+                src={profileUser?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                 alt={profileUser?.name}
-                className="w-32 h-32 rounded-full object-cover border-4 border-blue-500/30"
+                className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-blue-500/30"
               />
               
               {isOwnProfile && (
                 <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                   <div className="text-center">
-                    <UploadIcon size={20} className="text-white mx-auto mb-1" />
-                    <p className="text-xs text-white">Choose Image</p>
+                    <UploadIcon size={16} className="text-white mx-auto mb-1 md:w-5 md:h-5" />
+                    <p className="text-xs text-white hidden md:block">Choose Image</p>
                   </div>
                   <input
                     type="file"
@@ -200,50 +267,74 @@ const Profile = () => {
         <div className="rounded-card">
           <div className="border-b border-gray-700">
             <div className="p-6">
-              <div className="flex space-x-8">
-                <button className="text-white font-medium border-b-2 border-blue-500 pb-2">
-                  Videos
+              <div className="flex space-x-8 overflow-x-auto">
+                <button 
+                  onClick={() => setActiveTab('videos')}
+                  className={`text-white font-medium pb-2 whitespace-nowrap ${
+                    activeTab === 'videos' ? 'border-b-2 border-blue-500' : 'hover:text-blue-400'
+                  }`}
+                >
+                  Videos ({videos.length})
                 </button>
+                {isOwnProfile && pendingVideos.length > 0 && (
+                  <button 
+                    onClick={() => setActiveTab('approval')}
+                    className={`text-white font-medium pb-2 whitespace-nowrap ${
+                      activeTab === 'approval' ? 'border-b-2 border-blue-500' : 'hover:text-blue-400'
+                    }`}
+                  >
+                    For Approval ({pendingVideos.length})
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Videos Section */}
+          {/* Content Section */}
           <div className="p-6">
-            {videos.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-6xl mb-4">📹</div>
-                <h3 className="text-xl font-semibold text-white mb-2">No videos available</h3>
-                <p className="text-gray-400">
-                  {isOwnProfile 
-                    ? 'Upload your first video to get started!' 
-                    : 'This user hasn\'t uploaded any videos yet.'}
-                </p>
-              </div>
-            ) : (
-              <InfiniteScroll
-                dataLength={videos.length}
-                next={() => {}}
-                hasMore={hasMore}
-                loader={
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                  </div>
-                }
-                endMessage={
-                  videos.length > 0 && (
-                    <div className="text-center py-8 text-gray-400">
-                      No more videos available.
-                    </div>
-                  )
-                }
-              >
+            {activeTab === 'videos' ? (
+              videos.length === 0 ? (
+                <div className="text-center py-20">
+                  <div className="text-6xl mb-4">📹</div>
+                  <h3 className="text-xl font-semibold text-white mb-2">No videos available</h3>
+                  <p className="text-gray-400">
+                    {isOwnProfile 
+                      ? 'Upload your first video to get started!' 
+                      : 'This user hasn\'t uploaded any videos yet.'}
+                  </p>
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {videos.map((video) => (
                     <VideoCard key={video.id} video={video} />
                   ))}
                 </div>
-              </InfiniteScroll>
+              )
+            ) : (
+              pendingVideos.length === 0 ? (
+                <div className="text-center py-20">
+                  <div className="text-6xl mb-4">⏳</div>
+                  <h3 className="text-xl font-semibold text-white mb-2">No pending videos</h3>
+                  <p className="text-gray-400">All your videos have been approved!</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2 mb-6">
+                    <Clock className="text-yellow-500" size={20} />
+                    <h3 className="text-lg font-semibold text-white">Videos Waiting for Approval</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {pendingVideos.map((video) => (
+                      <div key={video.id} className="relative">
+                        <VideoCard video={video} />
+                        <div className="absolute top-2 right-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded">
+                          Pending
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
             )}
           </div>
         </div>
