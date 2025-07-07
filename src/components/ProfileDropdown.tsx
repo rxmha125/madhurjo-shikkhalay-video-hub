@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { User, LogOut, Clock } from 'lucide-react';
+import { User, LogOut, Clock, CreditCard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 
@@ -51,6 +51,15 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose }) =>
             )}
           </Link>
         )}
+        
+        <Link
+          to="/subscriptions"
+          onClick={onClose}
+          className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-800/50 rounded-lg transition-all duration-300 hover:scale-105"
+        >
+          <CreditCard size={16} />
+          <span>Subscriptions</span>
+        </Link>
         
         <button
           onClick={handleLogout}

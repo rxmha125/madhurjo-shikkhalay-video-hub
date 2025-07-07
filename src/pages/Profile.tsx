@@ -35,6 +35,7 @@ const Profile = () => {
   const [deletingVideos, setDeletingVideos] = useState<string[]>([]);
   const [editingVideo, setEditingVideo] = useState<string | null>(null);
   const [updatingVideo, setUpdatingVideo] = useState(false);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     description: ''
@@ -279,6 +280,64 @@ const Profile = () => {
       toast.error('Failed to update profile picture');
     } finally {
       setUploadingAvatar(false);
+    }
+  };
+
+  const handleThumbnailUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingVideo) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a valid image file (JPG, PNG, or WebP)');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error('Image must be smaller than 5MB');
+      return;
+    }
+
+    setUploadingThumbnail(true);
+
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${editingVideo}/${Date.now()}.${fileExt}`;
+
+      // Upload thumbnail to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('thumbnails')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload thumbnail');
+        return;
+      }
+
+      // Get public URL for the uploaded thumbnail
+      const { data: urlData } = supabase.storage
+        .from('thumbnails')
+        .getPublicUrl(fileName);
+
+      const thumbnailUrl = urlData.publicUrl;
+      
+      // Update form state with new thumbnail URL
+      setVideoEditForm(prev => ({ ...prev, thumbnail: thumbnailUrl }));
+      
+      toast.success('Thumbnail uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading thumbnail:', error);
+      toast.error('Failed to upload thumbnail');
+    } finally {
+      setUploadingThumbnail(false);
     }
   };
 
@@ -705,15 +764,40 @@ const Profile = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
-                  Thumbnail URL
+                  Thumbnail
                 </label>
-                <input
-                  type="url"
-                  value={videoEditForm.thumbnail}
-                  onChange={(e) => setVideoEditForm(prev => ({ ...prev, thumbnail: e.target.value }))}
-                  className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
-                  placeholder="Thumbnail URL"
-                />
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailUpload}
+                    className="hidden"
+                    id="thumbnail-upload"
+                    disabled={uploadingThumbnail}
+                  />
+                  <label
+                    htmlFor="thumbnail-upload"
+                    className="w-full bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded border border-gray-600 cursor-pointer transition-colors flex items-center justify-center"
+                  >
+                    {uploadingThumbnail ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Uploading...</span>
+                      </div>
+                    ) : (
+                      'Choose Thumbnail'
+                    )}
+                  </label>
+                  {videoEditForm.thumbnail && (
+                    <div className="mt-2">
+                      <img
+                        src={videoEditForm.thumbnail}
+                        alt="Thumbnail preview"
+                        className="w-20 h-12 object-cover rounded border border-gray-600"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex space-x-3 pt-4">
