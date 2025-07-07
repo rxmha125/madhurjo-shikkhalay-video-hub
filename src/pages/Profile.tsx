@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pencil, Upload as UploadIcon, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import InfiniteScroll from 'react-infinite-scroll-component';
 import VideoCard from '../components/VideoCard';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Video {
   id: string;
@@ -12,6 +13,7 @@ interface Video {
   thumbnail: string;
   views: number;
   created_at: string;
+  is_approved: boolean;
   creator: {
     id: string;
     name: string;
@@ -25,7 +27,6 @@ const Profile = () => {
   const [profileUser, setProfileUser] = useState<any>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [pendingVideos, setPendingVideos] = useState<Video[]>([]);
-  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('videos');
@@ -85,6 +86,7 @@ const Profile = () => {
         thumbnail: video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
         views: video.views || 0,
         created_at: video.created_at,
+        is_approved: video.is_approved,
         creator: {
           id: video.creator?.id || '',
           name: video.creator?.name || 'Unknown',
@@ -120,6 +122,7 @@ const Profile = () => {
         thumbnail: video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
         views: video.views || 0,
         created_at: video.created_at,
+        is_approved: video.is_approved,
         creator: {
           id: video.creator?.id || '',
           name: video.creator?.name || 'Unknown',
@@ -140,38 +143,35 @@ const Profile = () => {
     setUploadingAvatar(true);
 
     try {
-      // Create a blob URL for immediate display
-      const blobUrl = URL.createObjectURL(file);
+      // For demo purposes, we'll use a fixed avatar
+      const newAvatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
       
-      // Update profile with the default avatar path (permanent solution)
-      const defaultAvatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+      // Update profile in database
+      await updateProfile({ avatar: newAvatar });
       
-      console.log('Updating profile avatar to:', defaultAvatar);
+      // Update local state
+      setProfileUser((prev: any) => ({ ...prev, avatar: newAvatar }));
       
-      await updateProfile({ avatar: defaultAvatar });
-      
-      // Update local state immediately
-      setProfileUser((prev: any) => ({ ...prev, avatar: defaultAvatar }));
-      
-      console.log('Avatar updated successfully');
-      
-      // Clean up blob URL after a short delay
-      setTimeout(() => {
-        URL.revokeObjectURL(blobUrl);
-      }, 1000);
-      
+      toast.success('Profile picture updated successfully!');
     } catch (error) {
       console.error('Error updating avatar:', error);
+      toast.error('Failed to update profile picture');
     } finally {
       setUploadingAvatar(false);
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (isOwnProfile) {
-      updateProfile(editForm);
-      setProfileUser((prev: any) => ({ ...prev, ...editForm }));
-      setEditing(false);
+      try {
+        await updateProfile(editForm);
+        setProfileUser((prev: any) => ({ ...prev, ...editForm }));
+        setEditing(false);
+        toast.success('Profile updated successfully!');
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        toast.error('Failed to update profile');
+      }
     }
   };
 
@@ -187,7 +187,7 @@ const Profile = () => {
     <div className="min-h-screen py-20 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Profile Header */}
-        <div className="rounded-card p-8 mb-8">
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-8 mb-8">
           <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
             {/* Avatar */}
             <div className="relative group">
@@ -228,25 +228,25 @@ const Profile = () => {
                     type="text"
                     value={editForm.name}
                     onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                    className="input-field text-2xl font-bold"
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white text-2xl font-bold focus:outline-none focus:border-blue-500"
                     placeholder="Your name"
                   />
                   <textarea
                     value={editForm.description}
                     onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                    className="input-field w-full h-24 resize-none"
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white h-24 resize-none focus:outline-none focus:border-blue-500"
                     placeholder="Tell us about yourself..."
                   />
                   <div className="flex space-x-3">
                     <button
                       onClick={handleSaveProfile}
-                      className="btn-primary"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       Save Changes
                     </button>
                     <button
                       onClick={() => setEditing(false)}
-                      className="btn-secondary"
+                      className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                     >
                       Cancel
                     </button>
@@ -296,7 +296,7 @@ const Profile = () => {
         </div>
 
         {/* Content Tabs */}
-        <div className="rounded-card">
+        <div className="bg-gray-900 border border-gray-700 rounded-lg">
           <div className="border-b border-gray-700">
             <div className="p-6">
               <div className="flex space-x-8 overflow-x-auto">
@@ -359,7 +359,7 @@ const Profile = () => {
                     {pendingVideos.map((video) => (
                       <div key={video.id} className="relative">
                         <VideoCard video={video} />
-                        <div className="absolute top-2 right-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded">
+                        <div className="absolute top-2 right-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded font-medium">
                           Pending
                         </div>
                       </div>

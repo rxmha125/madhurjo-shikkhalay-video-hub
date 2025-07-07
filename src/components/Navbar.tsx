@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, Upload, Facebook, Youtube, Menu, X } from 'lucide-react';
+import { Bell, Upload, Facebook, Youtube, Menu, X, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import AuthModal from './AuthModal';
@@ -12,7 +12,7 @@ import ProfileDropdown from './ProfileDropdown';
 const Navbar = () => {
   const location = useLocation();
   const { profile } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, pendingVideosCount } = useNotifications();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -93,6 +93,17 @@ const Navbar = () => {
               >
                 Info
               </Link>
+
+              {/* Admin For Approval Button - Desktop */}
+              {profile?.is_admin && (
+                <Link
+                  to="/admin/approvals"
+                  className="flex items-center space-x-2 px-3 py-2 bg-yellow-600/20 border border-yellow-500/30 text-yellow-400 rounded-lg hover:bg-yellow-600/30 transition-colors"
+                >
+                  <Clock size={16} />
+                  <span>For Approval ({pendingVideosCount})</span>
+                </Link>
+              )}
             </div>
 
             {/* Right Section */}

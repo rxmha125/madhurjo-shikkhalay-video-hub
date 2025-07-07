@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { X, Upload, Check, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -61,14 +62,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
       }
 
       console.log('Video created:', videoData);
-      console.log('Current user profile:', profile);
 
       if (profile.is_admin) {
         toast.success('Video uploaded successfully!');
+        setSubmitted(true);
         setStep(4);
       } else {
-        // Find admin user by email
-        console.log('Looking for admin with email: mamadhurjo.shikkhalay@gmail.com');
+        // Find admin user
         const { data: adminProfile, error: adminError } = await supabase
           .from('profiles')
           .select('*')
@@ -76,43 +76,19 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
           .eq('is_admin', true)
           .single();
 
-        console.log('Admin query result:', { adminProfile, adminError });
-
         if (!adminError && adminProfile) {
-          // Create notification in database
-          const { data: notificationData, error: notifError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: adminProfile.id,
-              type: 'upload_review',
-              title: 'New Video Review Request',
-              content: `New video "${formData.title}" needs approval from ${profile.name}`,
-              video_id: videoData.id
-            })
-            .select()
-            .single();
+          // Create notification for admin
+          await addNotification({
+            user_id: adminProfile.id,
+            type: 'upload_review',
+            title: 'New Video Review Request',
+            content: `New video "${formData.title}" needs approval from ${profile.name}`,
+            video_id: videoData.id
+          });
 
-          console.log('Notification creation result:', { notificationData, notifError });
-
-          if (notifError) {
-            console.error('Error creating notification:', notifError);
-          } else {
-            console.log('Notification created successfully:', notificationData);
-            
-            // Also add to local notification context for real-time updates
-            addNotification({
-              type: 'upload_review',
-              message: `New video "${formData.title}" needs approval from ${profile.name}`,
-              read: false,
-              data: {
-                videoTitle: formData.title,
-                uploaderName: profile.name,
-                thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null
-              }
-            });
-          }
+          console.log('Admin notification sent successfully');
         } else {
-          console.error('Admin not found or error:', { adminError, adminProfile });
+          console.error('Admin not found:', adminError);
         }
 
         toast.success('Video uploaded for review!');
@@ -130,6 +106,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
   const resetModal = () => {
     setStep(1);
     setSubmitted(false);
+    setUploading(false);
     setFormData({
       title: '',
       description: '',
@@ -144,7 +121,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="rounded-card w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+      <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={resetModal}
           className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10"
@@ -221,7 +198,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  className="input-field w-full"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                   placeholder="Enter video title"
                   required
                 />
@@ -234,7 +211,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="input-field w-full h-32 resize-none"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 h-32 resize-none"
                   placeholder="Describe your video content"
                 />
               </div>
@@ -250,7 +227,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                     const file = e.target.files?.[0];
                     if (file) handleFileUpload(file, 'thumbnail');
                   }}
-                  className="input-field w-full"
+                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -258,13 +235,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
             <div className="mt-6 flex justify-between">
               <button
                 onClick={() => setStep(1)}
-                className="btn-secondary"
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(3)}
-                className="btn-primary"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 disabled={!formData.title}
               >
                 Next
@@ -325,13 +302,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
             <div className="mt-6 flex justify-between">
               <button
                 onClick={() => setStep(2)}
-                className="btn-secondary"
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={() => setStep(4)}
-                className="btn-primary"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Next
               </button>
@@ -353,7 +330,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                 </p>
                 <button
                   onClick={resetModal}
-                  className="btn-primary"
+                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                 >
                   Done
                 </button>
@@ -364,32 +341,40 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                   <Clock size={32} className="text-white" />
                 </div>
                 <h2 className="text-2xl font-bold text-white mb-4">
-                  {submitted ? 'Submitted for Review!' : 'Pending Approval'}
+                  {submitted ? 'Submitted for Review!' : 'Ready to Submit'}
                 </h2>
                 <p className="text-gray-400 mb-6">
                   {submitted 
                     ? 'Your video has been submitted and the admin has been notified.' 
-                    : 'Needs approval from admin before it goes live.'}
+                    : 'Your video needs approval from admin before it goes live.'}
                 </p>
                 {submitted ? (
                   <button
                     onClick={resetModal}
-                    className="bg-green-600 hover:bg-green-700 text-white font-medium px-6 py-2 rounded-lg transition-colors"
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                   >
                     Done
                   </button>
                 ) : (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={uploading}
-                    className={`font-medium px-6 py-2 rounded-lg transition-colors ${
-                      uploading 
-                        ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    }`}
-                  >
-                    {uploading ? 'Sending...' : 'Send'}
-                  </button>
+                  <div className="flex justify-center space-x-4">
+                    <button
+                      onClick={() => setStep(3)}
+                      className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={uploading}
+                      className={`px-6 py-2 rounded-lg transition-colors ${
+                        uploading 
+                          ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {uploading ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}

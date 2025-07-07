@@ -2,7 +2,6 @@
 import React from 'react';
 import { Check, Clock, Heart, MessageCircle, Upload } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
-import { useAuth } from '../contexts/AuthContext';
 
 interface NotificationDropdownProps {
   isOpen: boolean;
@@ -11,7 +10,6 @@ interface NotificationDropdownProps {
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose }) => {
   const { notifications, markAsRead, markAllAsRead } = useNotifications();
-  const { profile } = useAuth();
 
   if (!isOpen) return null;
 
@@ -28,19 +26,12 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
     }
   };
 
-  const handleApproval = (notificationId: string, approved: boolean) => {
-    // Handle video approval/rejection
-    markAsRead(notificationId);
-    // In real app, this would make API call to approve/reject video
-    console.log(`Video ${approved ? 'approved' : 'rejected'}`);
-  };
-
   return (
-    <div className="absolute top-12 right-0 w-80 max-w-[calc(100vw-1rem)] rounded-card shadow-xl z-50 max-h-96 overflow-hidden">
+    <div className="absolute top-12 right-0 w-80 max-w-[calc(100vw-2rem)] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden">
       <div className="p-4 border-b border-gray-700">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-white">Notifications</h3>
-          {notifications.some(n => !n.read) && (
+          {notifications.some(n => !n.is_read) && (
             <button
               onClick={markAllAsRead}
               className="text-sm text-blue-400 hover:text-blue-300"
@@ -60,11 +51,11 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
         ) : (
           notifications.map((notification) => (
             <div
-              key={notification._id}
-              className={`p-4 border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors ${
-                !notification.read ? 'bg-blue-500/5 border-l-2 border-l-blue-500' : ''
+              key={notification.id}
+              className={`p-4 border-b border-gray-700/50 hover:bg-gray-800/30 transition-colors cursor-pointer ${
+                !notification.is_read ? 'bg-blue-500/5 border-l-2 border-l-blue-500' : ''
               }`}
-              onClick={() => markAsRead(notification._id)}
+              onClick={() => markAsRead(notification.id)}
             >
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0 mt-1">
@@ -72,48 +63,18 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-white break-words">
-                    {notification.message}
+                  <p className="text-sm font-medium text-white mb-1">
+                    {notification.title}
+                  </p>
+                  <p className="text-sm text-gray-300 break-words">
+                    {notification.content}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(notification.createdAt).toLocaleDateString()}
+                    {new Date(notification.created_at).toLocaleDateString()}
                   </p>
-
-                  {/* Admin Review Actions */}
-                  {notification.type === 'upload_review' && profile?.is_admin && !notification.read && (
-                    <div className="flex flex-col space-y-2 mt-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-2">
-                      {notification.data?.thumbnail && (
-                        <img
-                          src={notification.data.thumbnail}
-                          alt="Video thumbnail"
-                          className="w-16 h-9 object-cover rounded"
-                        />
-                      )}
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApproval(notification._id, true);
-                          }}
-                          className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition-colors"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApproval(notification._id, false);
-                          }}
-                          className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg transition-colors"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {!notification.read && (
+                {!notification.is_read && (
                   <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2"></div>
                 )}
               </div>

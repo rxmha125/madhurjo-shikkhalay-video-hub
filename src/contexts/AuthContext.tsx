@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
@@ -42,7 +43,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
@@ -50,7 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile after authentication
           setTimeout(() => {
             fetchUserProfile(session.user.id);
           }, 0);
@@ -61,7 +60,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session);
       setSession(session);
@@ -88,8 +86,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // If profile doesn't exist, it might be created by the trigger
-        // Wait a moment and try again
         setTimeout(async () => {
           const { data: retryData, error: retryError } = await supabase
             .from('profiles')
@@ -131,7 +127,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('Attempting signup for:', email, 'with name:', name);
     setIsLoading(true);
     
-    // Use the current origin without hash for redirect
     const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({
@@ -146,14 +141,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     console.log('Signup result:', { data, error });
-    
-    // If signup was successful and user is confirmed, they're automatically logged in
-    if (!error && data.user && !data.user.email_confirmed_at) {
-      console.log('User created but email not confirmed');
-    } else if (!error && data.user && data.user.email_confirmed_at) {
-      console.log('User created and automatically logged in');
-    }
-    
     setIsLoading(false);
     return { error };
   };
@@ -167,11 +154,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user || !profile) return;
     
     console.log('Updating profile:', updates);
-    
-    // If updating avatar and it's a blob URL, use the default avatar instead
-    if (updates.avatar && updates.avatar.startsWith('blob:')) {
-      updates.avatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
-    }
     
     const { error } = await supabase
       .from('profiles')
