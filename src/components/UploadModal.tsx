@@ -174,17 +174,17 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
 
   const StepIndicator = ({ step, isCompleted, isCurrent }: { step: number, isCompleted: boolean, isCurrent: boolean }) => (
     <div className="flex items-center">
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 text-sm sm:text-base ${
         isCompleted 
           ? 'bg-blue-600 border-blue-600 text-white' 
           : isCurrent 
             ? 'border-blue-600 text-blue-600 bg-gray-800' 
             : 'border-gray-600 text-gray-400 bg-gray-800'
       }`}>
-        {isCompleted ? <Check size={20} /> : step}
+        {isCompleted ? <Check size={16} className="sm:w-5 sm:h-5" /> : step}
       </div>
       {step < 4 && (
-        <div className={`w-16 h-0.5 mx-2 transition-all duration-300 ${
+        <div className={`w-8 sm:w-16 h-0.5 mx-1 sm:mx-2 transition-all duration-300 ${
           isCompleted ? 'bg-blue-600' : 'bg-gray-600'
         }`} />
       )}
@@ -339,14 +339,14 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] bg-gray-900 border-gray-700">
-        <DialogHeader>
-          <DialogTitle className="text-white text-xl">Upload Video</DialogTitle>
+      <DialogContent className="w-[95vw] max-w-[600px] mx-auto bg-gray-900 border-gray-700 max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-white text-lg sm:text-xl text-center">Upload Video</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Step Indicator */}
-          <div className="flex justify-center items-center">
+          <div className="flex justify-center items-center px-2">
             {[1, 2, 3, 4].map((step) => (
               <StepIndicator
                 key={step}
@@ -358,22 +358,22 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           {/* Step Content */}
-          <div className="min-h-[200px]">
+          <div className="min-h-[200px] px-2 sm:px-0">
             {renderStep()}
           </div>
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between items-center pt-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0 pt-4 px-2 sm:px-0">
             <Button
               type="button"
               onClick={prevStep}
               variant="outline"
-              className={`border-gray-600 text-gray-300 hover:bg-gray-800 ${
+              className={`w-full sm:w-auto border-gray-600 text-gray-300 hover:bg-gray-800 ${
                 currentStep === 1 ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               disabled={currentStep === 1}
             >
-              <ChevronLeft size={18} className="mr-1" />
+              <ChevronLeft size={16} className="mr-1" />
               Previous
             </Button>
 
@@ -381,15 +381,17 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
               <Button
                 onClick={handleFinalUpload}
                 disabled={isUploading}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
               >
                 {isUploading ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Uploading...</span>
+                    <span className="text-sm sm:text-base">Uploading...</span>
                   </div>
                 ) : (
-                  profile?.is_admin ? 'Publish Now' : 'Send for Approval'
+                  <span className="text-sm sm:text-base">
+                    {profile?.is_admin ? 'Publish Now' : 'Send for Approval'}
+                  </span>
                 )}
               </Button>
             ) : (
@@ -400,10 +402,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
                   (currentStep === 2 && !videoFile) ||
                   (currentStep === 3 && visibility === 'scheduled' && !scheduledDate)
                 }
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
               >
-                Next
-                <ChevronRight size={18} className="ml-1" />
+                <span className="text-sm sm:text-base">Next</span>
+                <ChevronRight size={16} className="ml-1" />
               </Button>
             )}
           </div>
