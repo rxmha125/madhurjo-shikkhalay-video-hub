@@ -22,17 +22,15 @@ const App = () => (
         <NotificationProvider>
           <Toaster />
           <BrowserRouter>
-            <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-              <Navbar />
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/profile/:id" element={<Profile />} />
-                <Route path="/watch/:id" element={<VideoWatch />} />
-                <Route path="/info" element={<Info />} />
-                <Route path="/admin/approvals" element={<AdminApprovals />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </div>
+            <Navbar />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/profile/:id" element={<Profile />} />
+              <Route path="/watch/:id" element={<VideoWatch />} />
+              <Route path="/info" element={<Info />} />
+              <Route path="/admin/approvals" element={<AdminApprovals />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
           </BrowserRouter>
         </NotificationProvider>
       </AuthProvider>
