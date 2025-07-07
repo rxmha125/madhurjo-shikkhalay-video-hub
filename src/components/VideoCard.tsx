@@ -82,9 +82,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
                 e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
               }}
             />
-            <span className="text-sm text-gray-400 hover:text-gray-300 transition-colors">
+            <Link 
+              to={`/profile/${video.creator.id}`}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
               {video.creator.name}
-            </span>
+            </Link>
           </div>
           
           <div className="flex items-center justify-between text-xs text-gray-500">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Play, Heart, Share2, Eye, Calendar, User, UserPlus, UserMinus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -327,9 +327,12 @@ const VideoWatch = () => {
                     className="w-12 h-12 rounded-full object-cover border-2 border-gray-600 flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white truncate">
+                    <Link 
+                      to={`/profile/${video.creator_id}`}
+                      className="font-semibold text-white hover:text-blue-400 transition-colors truncate block"
+                    >
                       {video.creator?.name}
-                    </h3>
+                    </Link>
                     <p className="text-sm text-gray-400">{followerCount} followers</p>
                   </div>
                   
