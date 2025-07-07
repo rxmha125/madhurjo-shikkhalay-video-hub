@@ -169,9 +169,14 @@ const VideoWatch = () => {
     if (!profile || !video || isLiking) return;
 
     setIsLiking(true);
+    
+    // Optimistic update
+    const wasLiked = hasLiked;
+    setHasLiked(!hasLiked);
+    setLikeCount(prev => wasLiked ? prev - 1 : prev + 1);
 
     try {
-      if (hasLiked) {
+      if (wasLiked) {
         const { error } = await supabase
           .from('video_likes')
           .delete()
@@ -179,7 +184,6 @@ const VideoWatch = () => {
           .eq('user_id', profile.id);
 
         if (error) throw error;
-        setHasLiked(false);
       } else {
         const { error } = await supabase
           .from('video_likes')
@@ -189,7 +193,6 @@ const VideoWatch = () => {
           });
 
         if (error) throw error;
-        setHasLiked(true);
 
         if (video.creator_id !== profile.id) {
           await addNotification({
@@ -203,6 +206,9 @@ const VideoWatch = () => {
       }
     } catch (error) {
       console.error('Error toggling like:', error);
+      // Revert optimistic update on error
+      setHasLiked(wasLiked);
+      setLikeCount(prev => wasLiked ? prev + 1 : prev - 1);
     } finally {
       setIsLiking(false);
     }
@@ -311,15 +317,17 @@ const VideoWatch = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+              {/* Mobile-first responsive layout */}
+              <div className="space-y-4">
+                {/* Creator Info */}
+                <div className="flex items-start space-x-3">
                   <img
                     src={video.creator?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                     alt={video.creator?.name}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-600"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-600 flex-shrink-0"
                   />
-                  <div>
-                    <h3 className="font-semibold text-white">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-white truncate">
                       {video.creator?.name}
                     </h3>
                     <p className="text-sm text-gray-400">{followerCount} followers</p>
@@ -329,48 +337,51 @@ const VideoWatch = () => {
                     <button
                       onClick={toggleFollow}
                       disabled={followLoading}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300 ${
+                      className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-sm transition-all duration-300 flex-shrink-0 ${
                         isFollowing
                           ? 'bg-gray-700 hover:bg-gray-600 text-white'
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       } disabled:opacity-50`}
                     >
-                      {isFollowing ? <UserMinus size={18} /> : <UserPlus size={18} />}
-                      <span>{isFollowing ? 'Unfollow' : 'Follow'}</span>
+                      {isFollowing ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                      <span className="hidden sm:inline">{isFollowing ? 'Unfollow' : 'Follow'}</span>
                     </button>
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleLike}
-                    disabled={!profile || isLiking}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-300 ${
-                      hasLiked
-                        ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-lg shadow-red-500/25'
-                        : 'bg-gray-800/50 backdrop-blur-sm border border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500'
-                    } disabled:opacity-50`}
-                  >
-                    <Heart size={18} className={hasLiked ? 'fill-current' : ''} />
-                    <span>{likeCount}</span>
-                  </button>
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={handleLike}
+                      disabled={!profile || isLiking}
+                      className={`flex items-center space-x-2 px-3 py-2 rounded-xl transition-all duration-300 ${
+                        hasLiked
+                          ? 'bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-lg shadow-red-500/25'
+                          : 'bg-gray-800/50 backdrop-blur-sm border border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500'
+                      } disabled:opacity-50`}
+                    >
+                      <Heart size={18} className={hasLiked ? 'fill-current' : ''} />
+                      <span>{likeCount}</span>
+                    </button>
 
-                  <button
-                    onClick={handleShare}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gray-800/50 backdrop-blur-sm border border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500 rounded-xl transition-all duration-300"
-                  >
-                    <Share2 size={18} />
-                    <span>Share</span>
-                  </button>
+                    <button
+                      onClick={handleShare}
+                      className="flex items-center space-x-2 px-3 py-2 bg-gray-800/50 backdrop-blur-sm border border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500 rounded-xl transition-all duration-300"
+                    >
+                      <Share2 size={18} />
+                      <span className="hidden sm:inline">Share</span>
+                    </button>
+                  </div>
 
                   {isOwnVideo && (
                     <button
                       onClick={handleDeleteVideo}
                       disabled={isDeleting}
-                      className="flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-xl transition-all duration-300"
+                      className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-xl transition-all duration-300"
                     >
-                      <Trash2 size={18} />
-                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                      <Trash2 size={16} />
+                      <span className="hidden sm:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
                     </button>
                   )}
                 </div>
