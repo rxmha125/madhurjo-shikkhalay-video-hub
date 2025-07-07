@@ -132,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('Attempting signup for:', email, 'with name:', name);
     setIsLoading(true);
     
+    // Use the current origin without hash for redirect
     const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({

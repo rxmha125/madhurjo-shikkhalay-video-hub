@@ -110,112 +110,115 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <X size={20} />
         </button>
 
-        {/* Main Content */}
-        <div className={`transition-transform duration-500 ease-in-out ${showEmailConfirmation ? '-translate-x-full' : 'translate-x-0'}`}>
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">
-              {isLogin ? 'Welcome Back' : 'Create Account'}
-            </h2>
-            <p className="text-gray-400">
-              {isLogin ? 'Sign in to your account' : 'Join Ma Madhurjo Shikkhalay'}
-            </p>
-          </div>
+        {/* Main Content Container with proper overflow handling */}
+        <div className="relative w-full h-full">
+          {/* Main Auth Form */}
+          <div className={`transition-transform duration-500 ease-in-out ${showEmailConfirmation ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}`}>
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                {isLogin ? 'Welcome Back' : 'Create Account'}
+              </h2>
+              <p className="text-gray-400">
+                {isLogin ? 'Sign in to your account' : 'Join Ma Madhurjo Shikkhalay'}
+              </p>
+            </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {!isLogin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="input-field w-full"
+                    placeholder="Enter your name"
+                    required={!isLogin}
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Full Name
+                  Email
                 </label>
                 <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="input-field w-full"
-                  placeholder="Enter your name"
-                  required={!isLogin}
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field w-full"
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input-field w-full pr-12"
-                  placeholder="Enter your password"
+                  placeholder="Enter your email"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
-            </button>
-          </form>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-field w-full pr-12"
+                    placeholder="Enter your password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-gray-400">
-              {isLogin ? "Don't have an account?" : "Already have an account?"}
               <button
-                onClick={switchAuthMode}
-                className="text-blue-400 hover:text-blue-300 ml-2 font-medium"
+                type="submit"
+                disabled={loading}
+                className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLogin ? 'Sign Up' : 'Sign In'}
+                {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
               </button>
-            </p>
-          </div>
-        </div>
+            </form>
 
-        {/* Email Confirmation Slide */}
-        <div className={`absolute inset-0 p-6 transition-transform duration-500 ease-in-out ${showEmailConfirmation ? 'translate-x-0' : 'translate-x-full'}`}>
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+            <div className="mt-6 text-center">
+              <p className="text-gray-400">
+                {isLogin ? "Don't have an account?" : "Already have an account?"}
+                <button
+                  onClick={switchAuthMode}
+                  className="text-blue-400 hover:text-blue-300 ml-2 font-medium"
+                >
+                  {isLogin ? 'Sign Up' : 'Sign In'}
+                </button>
+              </p>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Check Your Email</h3>
-            <p className="text-gray-400 mb-6">
-              We've sent a confirmation link to <span className="text-blue-400">{email}</span>. 
-              Please check your email and click the link to activate your account.
-            </p>
-            <button
-              onClick={handleClose}
-              className="btn-secondary"
-            >
-              Got it!
-            </button>
+          </div>
+
+          {/* Email Confirmation Slide - Positioned absolutely to prevent bleeding */}
+          <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${showEmailConfirmation ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0 pointer-events-none'}`}>
+            <div className="flex flex-col items-center justify-center h-full text-center bg-gray-900/95 rounded-card p-6">
+              <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Check Your Email</h3>
+              <p className="text-gray-400 mb-6">
+                We've sent a confirmation link to <span className="text-blue-400">{email}</span>. 
+                Please check your email and click the link to activate your account.
+              </p>
+              <button
+                onClick={handleClose}
+                className="btn-secondary"
+              >
+                Got it!
+              </button>
+            </div>
           </div>
         </div>
       </div>
