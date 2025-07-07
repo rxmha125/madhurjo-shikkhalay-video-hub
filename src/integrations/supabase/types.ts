@@ -230,6 +230,53 @@ export type Database = {
           },
         ]
       }
+      videos_for_approval: {
+        Row: {
+          created_at: string
+          creator_id: string | null
+          description: string | null
+          id: string
+          thumbnail: string | null
+          title: string
+          updated_at: string
+          video_url: string | null
+          views: number | null
+          visibility: string | null
+        }
+        Insert: {
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          id?: string
+          thumbnail?: string | null
+          title: string
+          updated_at?: string
+          video_url?: string | null
+          views?: number | null
+          visibility?: string | null
+        }
+        Update: {
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          id?: string
+          thumbnail?: string | null
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+          views?: number | null
+          visibility?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_for_approval_creator_id_fkey"
+            columns: ["creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

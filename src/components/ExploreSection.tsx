@@ -15,7 +15,6 @@ interface Video {
     name: string;
     avatar?: string;
   };
-  is_approved: boolean;
 }
 
 const ExploreSection = () => {
@@ -31,6 +30,7 @@ const ExploreSection = () => {
 
   const loadVideos = async () => {
     try {
+      // Only query videos table (approved videos)
       const { data, error } = await supabase
         .from('videos')
         .select(`
@@ -39,14 +39,12 @@ const ExploreSection = () => {
           thumbnail,
           views,
           created_at,
-          is_approved,
           creator:profiles(
             id,
             name,
             avatar
           )
         `)
-        .eq('is_approved', true)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -60,7 +58,6 @@ const ExploreSection = () => {
           thumbnail: video.thumbnail,
           views: video.views || 0,
           created_at: video.created_at,
-          is_approved: video.is_approved,
           creator: {
             id: video.creator?.id || '',
             name: video.creator?.name || 'Unknown',

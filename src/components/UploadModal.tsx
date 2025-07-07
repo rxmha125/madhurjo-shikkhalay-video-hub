@@ -41,34 +41,51 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
     setUploading(true);
 
     try {
-      // Insert video into database
-      const { data: videoData, error: videoError } = await supabase
-        .from('videos')
-        .insert({
-          title: formData.title,
-          description: formData.description,
-          creator_id: profile.id,
-          thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null,
-          visibility: formData.visibility,
-          is_approved: profile.is_admin
-        })
-        .select()
-        .single();
-
-      if (videoError) {
-        console.error('Error creating video:', videoError);
-        toast.error('Failed to upload video');
-        return;
-      }
-
-      console.log('Video created:', videoData);
-
       if (profile.is_admin) {
-        toast.success('Video uploaded successfully!');
-        setSubmitted(true);
-        setStep(4);
+        // Admins upload directly to videos table (approved immediately)
+        const { data: videoData, error: videoError } = await supabase
+          .from('videos')
+          .insert({
+            title: formData.title,
+            description: formData.description,
+            creator_id: profile.id,
+            thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null,
+            visibility: formData.visibility
+          })
+          .select()
+          .single();
+
+        if (videoError) {
+          console.error('Error creating video:', videoError);
+          toast.error('Failed to upload video');
+          return;
+        }
+
+        console.log('Admin video created directly:', videoData);
+        toast.success('Video uploaded and published successfully!');
       } else {
-        // Find admin user
+        // Regular users upload to videos_for_approval table
+        const { data: videoData, error: videoError } = await supabase
+          .from('videos_for_approval')
+          .insert({
+            title: formData.title,
+            description: formData.description,
+            creator_id: profile.id,
+            thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null,
+            visibility: formData.visibility
+          })
+          .select()
+          .single();
+
+        if (videoError) {
+          console.error('Error creating video for approval:', videoError);
+          toast.error('Failed to upload video');
+          return;
+        }
+
+        console.log('Video submitted for approval:', videoData);
+
+        // Find admin user to notify
         const { data: adminProfile, error: adminError } = await supabase
           .from('profiles')
           .select('*')
@@ -77,7 +94,6 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
           .single();
 
         if (!adminError && adminProfile) {
-          // Create notification for admin
           await addNotification({
             user_id: adminProfile.id,
             type: 'upload_review',
@@ -92,9 +108,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
         }
 
         toast.success('Video uploaded for review!');
-        setSubmitted(true);
-        setStep(4);
       }
+
+      setSubmitted(true);
+      setStep(4);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Upload failed. Please try again.');

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pencil, Upload as UploadIcon, Clock, Trash2 } from 'lucide-react';
@@ -13,7 +12,6 @@ interface Video {
   thumbnail: string;
   views: number;
   created_at: string;
-  is_approved: boolean;
   creator: {
     id: string;
     name: string;
@@ -69,11 +67,11 @@ const Profile = () => {
     if (!profile) return;
     
     try {
+      // Load approved videos from videos table
       const { data, error } = await supabase
         .from('videos')
         .select('*, creator:profiles!videos_creator_id_fkey(id, name, avatar)')
         .eq('creator_id', profile.id)
-        .eq('is_approved', true)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -87,7 +85,6 @@ const Profile = () => {
         thumbnail: video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
         views: video.views || 0,
         created_at: video.created_at,
-        is_approved: video.is_approved,
         creator: {
           id: video.creator?.id || '',
           name: video.creator?.name || 'Unknown',
@@ -105,11 +102,11 @@ const Profile = () => {
     if (!profile) return;
     
     try {
+      // Load pending videos from videos_for_approval table
       const { data, error } = await supabase
-        .from('videos')
-        .select('*, creator:profiles!videos_creator_id_fkey(id, name, avatar)')
+        .from('videos_for_approval')
+        .select('*, creator:profiles!videos_for_approval_creator_id_fkey(id, name, avatar)')
         .eq('creator_id', profile.id)
-        .eq('is_approved', false)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -123,7 +120,6 @@ const Profile = () => {
         thumbnail: video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png',
         views: video.views || 0,
         created_at: video.created_at,
-        is_approved: video.is_approved,
         creator: {
           id: video.creator?.id || '',
           name: video.creator?.name || 'Unknown',
@@ -283,8 +279,9 @@ const Profile = () => {
     setRemovingVideos(prev => [...prev, videoId]);
 
     try {
+      // Delete from videos_for_approval table
       const { error } = await supabase
-        .from('videos')
+        .from('videos_for_approval')
         .delete()
         .eq('id', videoId);
 

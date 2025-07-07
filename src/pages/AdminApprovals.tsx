@@ -33,15 +33,14 @@ const AdminApprovals = () => {
   }, [profile]);
 
   const loadPendingVideos = async () => {
-    console.log('Loading pending videos for admin...');
+    console.log('Loading pending videos from videos_for_approval table...');
     try {
       const { data, error } = await supabase
-        .from('videos')
+        .from('videos_for_approval')
         .select(`
           *,
-          creator:profiles!videos_creator_id_fkey(id, name, avatar)
+          creator:profiles!videos_for_approval_creator_id_fkey(id, name, avatar)
         `)
-        .eq('is_approved', false)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -75,19 +74,52 @@ const AdminApprovals = () => {
     }
   };
 
-  const handleVideoAction = async (videoId: string, approved: boolean) => {
-    console.log(`${approved ? 'Approving' : 'Declining'} video:`, videoId);
+  const handleApproveVideo = async (videoId: string) => {
+    console.log('Approving video:', videoId);
     setProcessingVideos(prev => [...prev, videoId]);
 
     try {
-      const { error } = await supabase
+      // Get the video data from videos_for_approval
+      const { data: videoData, error: fetchError } = await supabase
+        .from('videos_for_approval')
+        .select('*')
+        .eq('id', videoId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching video for approval:', fetchError);
+        toast.error('Failed to fetch video details');
+        return;
+      }
+
+      // Insert into videos table (approved)
+      const { error: insertError } = await supabase
         .from('videos')
-        .update({ is_approved: approved })
+        .insert({
+          title: videoData.title,
+          description: videoData.description,
+          thumbnail: videoData.thumbnail,
+          video_url: videoData.video_url,
+          creator_id: videoData.creator_id,
+          views: videoData.views,
+          visibility: videoData.visibility
+        });
+
+      if (insertError) {
+        console.error('Error inserting approved video:', insertError);
+        toast.error('Failed to approve video');
+        return;
+      }
+
+      // Delete from videos_for_approval table
+      const { error: deleteError } = await supabase
+        .from('videos_for_approval')
+        .delete()
         .eq('id', videoId);
 
-      if (error) {
-        console.error('Error updating video:', error);
-        toast.error('Failed to update video status');
+      if (deleteError) {
+        console.error('Error deleting from approval table:', deleteError);
+        toast.error('Failed to clean up approval table');
         return;
       }
 
@@ -97,10 +129,42 @@ const AdminApprovals = () => {
       // Refresh the pending count
       refreshPendingCount();
 
-      toast.success(`Video ${approved ? 'approved' : 'declined'} successfully`);
+      toast.success('Video approved and published successfully!');
     } catch (error) {
-      console.error('Error updating video:', error);
-      toast.error('Failed to update video status');
+      console.error('Error approving video:', error);
+      toast.error('Failed to approve video');
+    } finally {
+      setProcessingVideos(prev => prev.filter(id => id !== videoId));
+    }
+  };
+
+  const handleDeclineVideo = async (videoId: string) => {
+    console.log('Declining video:', videoId);
+    setProcessingVideos(prev => [...prev, videoId]);
+
+    try {
+      // Delete from videos_for_approval table
+      const { error } = await supabase
+        .from('videos_for_approval')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) {
+        console.error('Error declining video:', error);
+        toast.error('Failed to decline video');
+        return;
+      }
+
+      // Remove video from pending list
+      setPendingVideos(prev => prev.filter(video => video.id !== videoId));
+      
+      // Refresh the pending count
+      refreshPendingCount();
+
+      toast.success('Video declined and removed successfully');
+    } catch (error) {
+      console.error('Error declining video:', error);
+      toast.error('Failed to decline video');
     } finally {
       setProcessingVideos(prev => prev.filter(id => id !== videoId));
     }
@@ -183,7 +247,7 @@ const AdminApprovals = () => {
 
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => handleVideoAction(video.id, true)}
+                      onClick={() => handleApproveVideo(video.id)}
                       disabled={processingVideos.includes(video.id)}
                       className="flex-1 flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white py-2 px-3 rounded-lg transition-colors text-sm"
                     >
@@ -192,7 +256,7 @@ const AdminApprovals = () => {
                     </button>
                     
                     <button
-                      onClick={() => handleVideoAction(video.id, false)}
+                      onClick={() => handleDeclineVideo(video.id)}
                       disabled={processingVideos.includes(video.id)}
                       className="flex-1 flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white py-2 px-3 rounded-lg transition-colors text-sm"
                     >
