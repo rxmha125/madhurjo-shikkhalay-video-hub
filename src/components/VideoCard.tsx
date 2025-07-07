@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Eye, Calendar } from 'lucide-react';
 import { formatTimeAgo } from '../utils/timeUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Video {
   id: string;
@@ -22,12 +23,42 @@ interface VideoCardProps {
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
+  const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchThumbnail = async () => {
+      try {
+        const { data: thumbnailData } = await supabase
+          .from('thumbnails')
+          .select('thumbnail_url')
+          .eq('video_id', video.id)
+          .eq('is_active', true)
+          .single();
+
+        if (thumbnailData?.thumbnail_url) {
+          setActualThumbnail(thumbnailData.thumbnail_url);
+        } else if (video.thumbnail) {
+          setActualThumbnail(video.thumbnail);
+        }
+      } catch (error) {
+        console.log('No custom thumbnail found, using default');
+        if (video.thumbnail) {
+          setActualThumbnail(video.thumbnail);
+        }
+      }
+    };
+
+    fetchThumbnail();
+  }, [video.id, video.thumbnail]);
+
+  const thumbnailToShow = actualThumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+
   return (
     <Link to={`/watch/${video.id}`} className="group block">
       <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-xl hover:border-gray-600 hover:bg-gray-800/70 transition-all duration-300">
         <div className="relative aspect-video">
           <img
-            src={video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
+            src={thumbnailToShow}
             alt={video.title}
             className="w-full h-full object-cover group-hover:brightness-110 transition-all duration-300"
             onError={(e) => {

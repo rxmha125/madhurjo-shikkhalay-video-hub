@@ -28,6 +28,7 @@ const AdminApprovals = () => {
   const [loading, setLoading] = useState(true);
   const [processingVideos, setProcessingVideos] = useState<string[]>([]);
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  const [videoThumbnails, setVideoThumbnails] = useState<{[key: string]: string}>({});
 
   useEffect(() => {
     if (profile?.is_admin) {
@@ -68,6 +69,37 @@ const AdminApprovals = () => {
 
       console.log('Formatted pending videos:', formattedVideos);
       setPendingVideos(formattedVideos);
+
+      // Fetch actual thumbnails for each video
+      const thumbnailPromises = formattedVideos.map(async (video) => {
+        try {
+          const { data: thumbnailData } = await supabase
+            .from('thumbnails')
+            .select('thumbnail_url')
+            .eq('video_id', video.id)
+            .eq('is_active', true)
+            .single();
+
+          return {
+            videoId: video.id,
+            thumbnailUrl: thumbnailData?.thumbnail_url || video.thumbnail
+          };
+        } catch (error) {
+          return {
+            videoId: video.id,
+            thumbnailUrl: video.thumbnail
+          };
+        }
+      });
+
+      const thumbnailResults = await Promise.all(thumbnailPromises);
+      const thumbnailMap = thumbnailResults.reduce((acc, result) => {
+        acc[result.videoId] = result.thumbnailUrl;
+        return acc;
+      }, {} as {[key: string]: string});
+
+      setVideoThumbnails(thumbnailMap);
+
     } catch (error) {
       console.error('Error loading pending videos:', error);
       toast.error('Failed to load pending videos');
@@ -234,15 +266,19 @@ const AdminApprovals = () => {
                       autoPlay
                       className="w-full h-48 object-cover bg-black"
                       onEnded={() => setPlayingVideo(null)}
+                      preload="metadata"
                     >
                       Your browser does not support the video tag.
                     </video>
                   ) : (
                     <div className="relative">
                       <img
-                        src={video.thumbnail}
+                        src={videoThumbnails[video.id] || video.thumbnail}
                         alt={video.title}
                         className="w-full h-48 object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+                        }}
                       />
                       {video.video_url && (
                         <button

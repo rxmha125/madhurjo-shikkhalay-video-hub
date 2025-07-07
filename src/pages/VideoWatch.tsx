@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Heart, Share2, Eye, Calendar, User, UserPlus, UserMinus, Trash2 } from 'lucide-react';
@@ -37,6 +36,7 @@ const VideoWatch = () => {
   const [hasLiked, setHasLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
 
   const { isFollowing, followerCount, isLoading: followLoading, toggleFollow } = useFollowSystem(video?.creator_id);
   useViewTracking(id || '');
@@ -50,6 +50,31 @@ const VideoWatch = () => {
       checkUserLike();
     }
   }, [id, profile]);
+
+  useEffect(() => {
+    if (video?.id) {
+      fetchActualThumbnail();
+    }
+  }, [video?.id]);
+
+  const fetchActualThumbnail = async () => {
+    if (!video?.id) return;
+    
+    try {
+      const { data: thumbnailData } = await supabase
+        .from('thumbnails')
+        .select('thumbnail_url')
+        .eq('video_id', video.id)
+        .eq('is_active', true)
+        .single();
+
+      if (thumbnailData?.thumbnail_url) {
+        setActualThumbnail(thumbnailData.thumbnail_url);
+      }
+    } catch (error) {
+      console.log('No custom thumbnail found');
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -241,6 +266,8 @@ const VideoWatch = () => {
     );
   }
 
+  const thumbnailToShow = actualThumbnail || video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="container mx-auto px-4 py-20">
@@ -250,16 +277,20 @@ const VideoWatch = () => {
               {video.video_url ? (
                 <video
                   src={video.video_url}
-                  poster={video.thumbnail}
+                  poster={thumbnailToShow}
                   controls
                   className="w-full aspect-video bg-black"
                   style={{ outline: 'none' }}
+                  preload="metadata"
                 >
                   Your browser does not support the video tag.
                 </video>
               ) : (
                 <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-                  <Play size={64} className="text-gray-400" />
+                  <div className="text-center">
+                    <Play size={64} className="text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-400">Video not available</p>
+                  </div>
                 </div>
               )}
             </div>

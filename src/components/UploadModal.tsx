@@ -1,10 +1,13 @@
 
 import React, { useState } from 'react';
-import { X, Upload, Check, Clock } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNotifications } from '../contexts/NotificationContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
+import { Upload, X } from 'lucide-react';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -12,393 +15,225 @@ interface UploadModalProps {
 }
 
 const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    thumbnail: null as File | null,
-    video: null as File | null,
-    visibility: 'public' as 'public' | 'private' | 'scheduled'
-  });
-  const [uploading, setUploading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const { profile } = useAuth();
-  const { addNotification } = useNotifications();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const handleFileUpload = (file: File, type: 'video' | 'thumbnail') => {
-    setFormData(prev => ({ ...prev, [type]: file }));
-    if (type === 'video') {
-      setStep(2);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!formData.title || !formData.video || !profile) {
-      toast.error('Please fill in all required fields');
+  const handleVideoUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!profile || !title.trim() || !videoFile) {
+      toast.error('Please fill in all required fields and select a video file');
       return;
     }
 
-    setUploading(true);
+    setIsUploading(true);
 
     try {
-      if (profile.is_admin) {
-        // Admins upload directly to videos table (approved immediately)
-        const { data: videoData, error: videoError } = await supabase
-          .from('videos')
-          .insert({
-            title: formData.title,
-            description: formData.description,
-            creator_id: profile.id,
-            thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null,
-            visibility: formData.visibility
-          })
-          .select()
-          .single();
+      // Upload video file
+      const videoFileName = `${Date.now()}-${videoFile.name}`;
+      const { data: videoData, error: videoError } = await supabase.storage
+        .from('videos')
+        .upload(videoFileName, videoFile);
 
-        if (videoError) {
-          console.error('Error creating video:', videoError);
-          toast.error('Failed to upload video');
-          return;
-        }
+      if (videoError) throw videoError;
 
-        console.log('Admin video created directly:', videoData);
-        toast.success('Video uploaded and published successfully!');
-      } else {
-        // Regular users upload to videos_for_approval table
-        const { data: videoData, error: videoError } = await supabase
-          .from('videos_for_approval')
-          .insert({
-            title: formData.title,
-            description: formData.description,
-            creator_id: profile.id,
-            thumbnail: formData.thumbnail ? '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png' : null,
-            visibility: formData.visibility
-          })
-          .select()
-          .single();
+      // Get video URL
+      const { data: videoUrlData } = supabase.storage
+        .from('videos')
+        .getPublicUrl(videoFileName);
 
-        if (videoError) {
-          console.error('Error creating video for approval:', videoError);
-          toast.error('Failed to upload video');
-          return;
-        }
+      let thumbnailUrl = null;
 
-        console.log('Video submitted for approval:', videoData);
+      // Upload thumbnail if provided
+      if (thumbnailFile) {
+        const thumbnailFileName = `${Date.now()}-${thumbnailFile.name}`;
+        const { data: thumbnailData, error: thumbnailError } = await supabase.storage
+          .from('thumbnails')
+          .upload(thumbnailFileName, thumbnailFile);
 
-        // Find admin user to notify
-        const { data: adminProfile, error: adminError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('email', 'mamadhurjo.shikkhalay@gmail.com')
-          .eq('is_admin', true)
-          .single();
-
-        if (!adminError && adminProfile) {
-          await addNotification({
-            user_id: adminProfile.id,
-            type: 'upload_review',
-            title: 'New Video Review Request',
-            content: `New video "${formData.title}" needs approval from ${profile.name}`,
-            video_id: videoData.id
-          });
-
-          console.log('Admin notification sent successfully');
+        if (thumbnailError) {
+          console.error('Thumbnail upload error:', thumbnailError);
         } else {
-          console.error('Admin not found:', adminError);
+          const { data: thumbnailUrlData } = supabase.storage
+            .from('thumbnails')
+            .getPublicUrl(thumbnailFileName);
+          thumbnailUrl = thumbnailUrlData.publicUrl;
         }
-
-        toast.success('Video uploaded for review!');
       }
 
-      setSubmitted(true);
-      setStep(4);
+      // Create video record
+      const videoRecord = {
+        title: title.trim(),
+        description: description.trim() || null,
+        video_url: videoUrlData.publicUrl,
+        thumbnail: thumbnailUrl,
+        creator_id: profile.id,
+        views: 0,
+        visibility: 'public'
+      };
+
+      // Check if user is admin - if yes, insert directly to videos table
+      if (profile.is_admin) {
+        const { data: newVideo, error: insertError } = await supabase
+          .from('videos')
+          .insert(videoRecord)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        // Store thumbnail in thumbnails table if provided
+        if (thumbnailUrl && newVideo) {
+          await supabase
+            .from('thumbnails')
+            .insert({
+              video_id: newVideo.id,
+              thumbnail_url: thumbnailUrl,
+              is_active: true
+            });
+        }
+
+        toast.success('Video uploaded and published successfully!');
+      } else {
+        // Regular users go to approval table
+        const { data: pendingVideo, error: insertError } = await supabase
+          .from('videos_for_approval')
+          .insert(videoRecord)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        // Store thumbnail in thumbnails table if provided
+        if (thumbnailUrl && pendingVideo) {
+          await supabase
+            .from('thumbnails')
+            .insert({
+              video_id: pendingVideo.id,
+              thumbnail_url: thumbnailUrl,
+              is_active: true
+            });
+        }
+
+        toast.success('Video uploaded and sent for approval!');
+      }
+
+      // Reset form
+      setTitle('');
+      setDescription('');
+      setVideoFile(null);
+      setThumbnailFile(null);
+      onClose();
+
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Upload failed. Please try again.');
+      toast.error('Failed to upload video. Please try again.');
     } finally {
-      setUploading(false);
+      setIsUploading(false);
     }
   };
 
-  const resetModal = () => {
-    setStep(1);
-    setSubmitted(false);
-    setUploading(false);
-    setFormData({
-      title: '',
-      description: '',
-      thumbnail: null,
-      video: null,
-      visibility: 'public'
-    });
-    onClose();
+  const handleReset = () => {
+    setTitle('');
+    setDescription('');
+    setVideoFile(null);
+    setThumbnailFile(null);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={resetModal}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-10"
-        >
-          <X size={20} />
-        </button>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px] bg-gray-900 border-gray-700">
+        <DialogHeader>
+          <DialogTitle className="text-white text-xl">Upload Video</DialogTitle>
+        </DialogHeader>
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-center mb-8">
-          {[1, 2, 3, 4].map((stepNum) => (
-            <div key={stepNum} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                step >= stepNum 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-700 text-gray-400'
-              }`}>
-                {step > stepNum ? <Check size={16} /> : stepNum}
-              </div>
-              {stepNum < 4 && (
-                <div className={`w-12 h-0.5 mx-2 transition-colors ${
-                  step > stepNum ? 'bg-blue-600' : 'bg-gray-700'
-                }`} />
+        <form onSubmit={handleVideoUpload} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Video Title *
+            </label>
+            <Input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter video title"
+              className="bg-gray-800 border-gray-600 text-white"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Description
+            </label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter video description"
+              className="bg-gray-800 border-gray-600 text-white min-h-[100px]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Video File *
+            </label>
+            <Input
+              type="file"
+              accept="video/*"
+              onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+              className="bg-gray-800 border-gray-600 text-white"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Thumbnail (Optional)
+            </label>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={(e) => setThumbnailFile(e.target.files?.[0] || null)}
+              className="bg-gray-800 border-gray-600 text-white"
+            />
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <Button
+              type="submit"
+              disabled={isUploading || !title.trim() || !videoFile}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isUploading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Uploading...</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Upload size={18} />
+                  <span>Upload Video</span>
+                </div>
               )}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1: Upload File */}
-        {step === 1 && (
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-6">Upload Video</h2>
+            </Button>
             
-            <div className="border-2 border-dashed border-gray-600 rounded-xl p-12 mb-6 hover:border-blue-500 transition-colors">
-              <Upload size={48} className="mx-auto mb-4 text-gray-400" />
-              <p className="text-gray-400 mb-4">
-                Drop your video file here or click to browse
-              </p>
-              <input
-                type="file"
-                accept="video/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileUpload(file, 'video');
-                }}
-                className="hidden"
-                id="video-upload"
-              />
-              <label htmlFor="video-upload" className="btn-primary cursor-pointer">
-                Choose Video File
-              </label>
-            </div>
-
-            {formData.video && (
-              <div className="rounded-lg bg-green-900/20 border border-green-500/30 p-4">
-                <p className="text-green-400">
-                  ✓ {formData.video.name} uploaded successfully
-                </p>
-              </div>
-            )}
+            <Button
+              type="button"
+              onClick={handleReset}
+              variant="outline"
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            >
+              <X size={18} />
+            </Button>
           </div>
-        )}
-
-        {/* Step 2: Video Details */}
-        {step === 2 && (
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Video Details</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                  placeholder="Enter video title"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 h-32 resize-none"
-                  placeholder="Describe your video content"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Thumbnail (Optional)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file, 'thumbnail');
-                  }}
-                  className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-between">
-              <button
-                onClick={() => setStep(1)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                disabled={!formData.title}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Visibility Settings */}
-        {step === 3 && (
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-6">Visibility Settings</h2>
-            
-            <div className="space-y-4">
-              {[
-                { value: 'public', label: 'Public', desc: 'Anyone can view this video' },
-                { value: 'private', label: 'Private', desc: 'Only you can view this video' },
-                { value: 'scheduled', label: 'Scheduled', desc: 'Publish at a specific time' }
-              ].map((option) => (
-                <label
-                  key={option.value}
-                  className={`block p-4 rounded-xl border cursor-pointer transition-colors ${
-                    formData.visibility === option.value
-                      ? 'border-blue-500 bg-blue-500/10'
-                      : 'border-gray-600 hover:border-gray-500'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      name="visibility"
-                      value={option.value}
-                      checked={formData.visibility === option.value}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
-                        visibility: e.target.value as 'public' | 'private' | 'scheduled' 
-                      }))}
-                      className="sr-only"
-                    />
-                    <div className={`w-4 h-4 rounded-full border-2 mr-3 ${
-                      formData.visibility === option.value
-                        ? 'border-blue-500 bg-blue-500'
-                        : 'border-gray-400'
-                    }`}>
-                      {formData.visibility === option.value && (
-                        <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5"></div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-medium text-white">{option.label}</div>
-                      <div className="text-sm text-gray-400">{option.desc}</div>
-                    </div>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            <div className="mt-6 flex justify-between">
-              <button
-                onClick={() => setStep(2)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Back
-              </button>
-              <button
-                onClick={() => setStep(4)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Review & Submit */}
-        {step === 4 && (
-          <div className="text-center">
-            {profile?.is_admin ? (
-              <div>
-                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check size={32} className="text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-4">Video Published!</h2>
-                <p className="text-gray-400 mb-6">
-                  Your video has been uploaded and is now live on the platform.
-                </p>
-                <button
-                  onClick={resetModal}
-                  className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <div>
-                <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock size={32} className="text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-4">
-                  {submitted ? 'Submitted for Review!' : 'Ready to Submit'}
-                </h2>
-                <p className="text-gray-400 mb-6">
-                  {submitted 
-                    ? 'Your video has been submitted and the admin has been notified.' 
-                    : 'Your video needs approval from admin before it goes live.'}
-                </p>
-                {submitted ? (
-                  <button
-                    onClick={resetModal}
-                    className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                  >
-                    Done
-                  </button>
-                ) : (
-                  <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => setStep(3)}
-                      className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={handleSubmit}
-                      disabled={uploading}
-                      className={`px-6 py-2 rounded-lg transition-colors ${
-                        uploading 
-                          ? 'bg-gray-500 text-gray-300 cursor-not-allowed' 
-                          : 'bg-blue-600 hover:bg-blue-700 text-white'
-                      }`}
-                    >
-                      {uploading ? 'Sending...' : 'Send'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
