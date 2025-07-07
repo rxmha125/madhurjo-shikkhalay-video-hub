@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Heart, MessageCircle, Reply, MoreVertical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +11,7 @@ interface Comment {
   created_at: string;
   user_id: string;
   video_id: string;
-  parent_id?: string;
+  parent_id?: string | null;
   likes: number;
   dislikes: number;
   user?: {
@@ -27,7 +28,8 @@ interface CommentSectionProps {
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, videoCreatorId }) => {
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [allComments, setAllComments] = useState<Comment[]>([]);
+  const [parentComments, setParentComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -36,41 +38,78 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
   const { addNotification } = useNotifications();
 
   useEffect(() => {
-    const fetchComments = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('comments')
-          .select(`
-            *,
-            profiles!comments_user_id_fkey (
-              name,
-              avatar
-            )
-          `)
-          .eq('video_id', videoId)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const commentsWithUser = data.map(comment => ({
-          ...comment,
-          user: {
-            name: comment.profiles?.name || 'Unknown User',
-            avatar: comment.profiles?.avatar
-          }
-        }));
-
-        setComments(commentsWithUser);
-      } catch (error) {
-        console.error('Error fetching comments:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchComments();
   }, [videoId]);
+
+  useEffect(() => {
+    if (!videoId) return;
+
+    // Real-time subscription for comments
+    const channel = supabase
+      .channel(`comments_${videoId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comments',
+          filter: `video_id=eq.${videoId}`
+        },
+        () => {
+          fetchComments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [videoId]);
+
+  const fetchComments = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select(`
+          *,
+          profiles!comments_user_id_fkey (
+            name,
+            avatar
+          )
+        `)
+        .eq('video_id', videoId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const commentsWithUser = data.map(comment => ({
+        ...comment,
+        user: {
+          name: comment.profiles?.name || 'Unknown User',
+          avatar: comment.profiles?.avatar
+        }
+      }));
+
+      setAllComments(commentsWithUser);
+
+      // Separate parent comments and build the tree structure
+      const parentComments = commentsWithUser.filter(comment => !comment.parent_id);
+      const replies = commentsWithUser.filter(comment => comment.parent_id);
+
+      // Add replies to their parent comments
+      const commentsWithReplies = parentComments.map(parent => ({
+        ...parent,
+        replies: replies.filter(reply => reply.parent_id === parent.id)
+      }));
+
+      setParentComments(commentsWithReplies);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,15 +134,6 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
 
       if (error) throw error;
 
-      const newCommentWithUser = {
-        ...data,
-        user: {
-          name: data.profiles?.name || 'Unknown User',
-          avatar: data.profiles?.avatar
-        }
-      };
-
-      setComments(prev => [newCommentWithUser, ...prev]);
       setNewComment('');
 
       // Notify video creator about new comment
@@ -145,30 +175,11 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
 
       if (error) throw error;
 
-      const newReply = {
-        ...data,
-        user: {
-          name: data.profiles?.name || 'Unknown User',
-          avatar: data.profiles?.avatar
-        }
-      };
-
-      // Update the comments state to include the new reply
-      setComments(prevComments => {
-        return prevComments.map(comment => {
-          if (comment.id === replyTo) {
-            const updatedReplies = comment.replies ? [...comment.replies, newReply] : [newReply];
-            return { ...comment, replies: updatedReplies };
-          }
-          return comment;
-        });
-      });
-
       setReplyTo(null);
       setReplyContent('');
 
-      // Optionally, notify the parent comment's author
-      const parentComment = comments.find(c => c.id === replyTo);
+      // Notify the parent comment's author
+      const parentComment = allComments.find(c => c.id === replyTo);
       if (parentComment && parentComment.user_id !== profile.id) {
         await addNotification({
           user_id: parentComment.user_id,
@@ -187,88 +198,28 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
     if (!profile) return;
 
     try {
-      // Get current comment to increment likes
-      const currentComment = comments.find(c => c.id === commentId);
+      const currentComment = allComments.find(c => c.id === commentId);
       if (!currentComment) return;
 
       const newLikes = currentComment.likes + 1;
 
-      // Optimistically update the local state
-      setComments(prevComments =>
-        prevComments.map(comment =>
-          comment.id === commentId
-            ? { ...comment, likes: newLikes }
-            : comment
-        )
-      );
-
-      // Update the like count in the database
       const { error } = await supabase
         .from('comments')
         .update({ likes: newLikes })
         .eq('id', commentId);
 
-      if (error) {
-        console.error('Error liking comment:', error);
-        // Revert the optimistic update if the database update fails
-        setComments(prevComments =>
-          prevComments.map(comment =>
-            comment.id === commentId
-              ? { ...comment, likes: currentComment.likes }
-              : comment
-          )
-        );
-      }
+      if (error) throw error;
     } catch (error) {
       console.error('Error liking comment:', error);
     }
   };
 
-  const handleDislike = async (commentId: string) => {
-    if (!profile) return;
-
-    try {
-      // Get current comment to increment dislikes
-      const currentComment = comments.find(c => c.id === commentId);
-      if (!currentComment) return;
-
-      const newDislikes = currentComment.dislikes + 1;
-
-      // Optimistically update the local state
-      setComments(prevComments =>
-        prevComments.map(comment =>
-          comment.id === commentId
-            ? { ...comment, dislikes: newDislikes }
-            : comment
-        )
-      );
-
-      // Update the dislike count in the database
-      const { error } = await supabase
-        .from('comments')
-        .update({ dislikes: newDislikes })
-        .eq('id', commentId);
-
-      if (error) {
-        console.error('Error disliking comment:', error);
-        // Revert the optimistic update if the database update fails
-        setComments(prevComments =>
-          prevComments.map(comment =>
-            comment.id === commentId
-              ? { ...comment, dislikes: currentComment.dislikes }
-              : comment
-          )
-        );
-      }
-    } catch (error) {
-      console.error('Error disliking comment:', error);
-    }
-  };
+  const totalCommentCount = parentComments.length;
 
   return (
     <div className="mt-8 space-y-6">
       <h3 className="text-xl font-semibold text-white mb-4">
-        Comments ({comments.length})
+        Comments ({totalCommentCount})
       </h3>
 
       {profile && (
@@ -277,21 +228,21 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
             <img
               src={profile.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
               alt={profile.name}
-              className="w-10 h-10 rounded-full object-cover"
+              className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/30"
             />
             <div className="flex-1">
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment..."
-                className="w-full bg-gray-800/50 border border-gray-600/50 rounded-lg px-4 py-3 text-white placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full bg-gray-800/50 backdrop-blur-sm border border-purple-500/30 rounded-xl px-4 py-3 text-white placeholder-purple-300 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400"
                 rows={3}
               />
               <div className="flex justify-end mt-2">
                 <button
                   type="submit"
                   disabled={!newComment.trim()}
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg shadow-purple-500/25"
                 >
                   Comment
                 </button>
@@ -303,47 +254,49 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
 
       <div className="space-y-4">
         {isLoading ? (
-          <div className="text-center text-gray-400 py-8">Loading comments...</div>
-        ) : comments.length === 0 ? (
-          <div className="text-center text-gray-400 py-8">
+          <div className="text-center text-purple-300 py-8">Loading comments...</div>
+        ) : parentComments.length === 0 ? (
+          <div className="text-center text-purple-300 py-8">
             No comments yet. Be the first to comment!
           </div>
         ) : (
-          comments.map((comment) => (
-            <div key={comment.id} className="bg-gray-800/30 rounded-lg p-4">
+          parentComments.map((comment) => (
+            <div key={comment.id} className="bg-gray-800/30 backdrop-blur-sm border border-purple-500/20 rounded-xl p-4">
               <div className="flex items-start space-x-3">
                 <img
                   src={comment.user?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                   alt={comment.user?.name || 'User'}
-                  className="w-8 h-8 rounded-full object-cover"
+                  className="w-8 h-8 rounded-full object-cover border border-purple-500/30"
                 />
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-1">
                     <span className="font-medium text-white text-sm">
                       {comment.user?.name || 'Unknown User'}
                     </span>
-                    <span className="text-gray-400 text-xs">
+                    <span className="text-purple-300 text-xs">
                       {new Date(comment.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="text-gray-300 text-sm mb-3">{comment.content}</p>
+                  <p className="text-purple-100 text-sm mb-3">{comment.content}</p>
                   
                   <div className="flex items-center space-x-4">
                     <button
                       onClick={() => handleLike(comment.id)}
-                      className="flex items-center space-x-1 text-gray-400 hover:text-red-400 transition-colors"
+                      className="flex items-center space-x-1 text-purple-300 hover:text-red-400 transition-colors"
                     >
                       <Heart size={16} />
                       <span className="text-xs">{comment.likes}</span>
                     </button>
                     
-                    <button
-                      onClick={() => setReplyTo(comment.id)}
-                      className="flex items-center space-x-1 text-gray-400 hover:text-blue-400 transition-colors"
-                    >
-                      <Reply size={16} />
-                      <span className="text-xs">Reply</span>
-                    </button>
+                    {profile && (
+                      <button
+                        onClick={() => setReplyTo(comment.id)}
+                        className="flex items-center space-x-1 text-purple-300 hover:text-blue-400 transition-colors"
+                      >
+                        <Reply size={16} />
+                        <span className="text-xs">Reply</span>
+                      </button>
+                    )}
                   </div>
 
                   {replyTo === comment.id && profile && (
@@ -352,14 +305,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
                         <img
                           src={profile.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                           alt={profile.name}
-                          className="w-6 h-6 rounded-full object-cover"
+                          className="w-6 h-6 rounded-full object-cover border border-purple-500/30"
                         />
                         <div className="flex-1">
                           <textarea
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder="Write a reply..."
-                            className="w-full bg-gray-700/50 border border-gray-600/50 rounded px-3 py-2 text-white placeholder-gray-400 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+                            className="w-full bg-gray-700/50 backdrop-blur-sm border border-purple-500/30 rounded-lg px-3 py-2 text-white placeholder-purple-300 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                             rows={2}
                           />
                           <div className="flex justify-end space-x-2 mt-1">
@@ -369,14 +322,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
                                 setReplyTo(null);
                                 setReplyContent('');
                               }}
-                              className="text-xs text-gray-400 hover:text-white px-2 py-1"
+                              className="text-xs text-purple-300 hover:text-white px-2 py-1 transition-colors"
                             >
                               Cancel
                             </button>
                             <button
                               type="submit"
                               disabled={!replyContent.trim()}
-                              className="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                              className="text-xs bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-1 rounded-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 transition-all duration-300"
                             >
                               Reply
                             </button>
@@ -389,22 +342,31 @@ const CommentSection: React.FC<CommentSectionProps> = ({ videoId, videoTitle, vi
                   {comment.replies && comment.replies.length > 0 && (
                     <div className="ml-6 mt-3 space-y-3">
                       {comment.replies.map((reply) => (
-                        <div key={reply.id} className="flex items-start space-x-2">
+                        <div key={reply.id} className="flex items-start space-x-2 bg-gray-900/30 backdrop-blur-sm border border-purple-500/10 rounded-lg p-3">
                           <img
                             src={reply.user?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                             alt={reply.user?.name || 'User'}
-                            className="w-6 h-6 rounded-full object-cover"
+                            className="w-6 h-6 rounded-full object-cover border border-purple-500/30"
                           />
                           <div className="flex-1">
                             <div className="flex items-center space-x-2 mb-1">
                               <span className="font-medium text-white text-xs">
                                 {reply.user?.name || 'Unknown User'}
                               </span>
-                              <span className="text-gray-400 text-xs">
+                              <span className="text-purple-300 text-xs">
                                 {new Date(reply.created_at).toLocaleDateString()}
                               </span>
                             </div>
-                            <p className="text-gray-300 text-xs">{reply.content}</p>
+                            <p className="text-purple-100 text-xs">{reply.content}</p>
+                            <div className="flex items-center space-x-2 mt-2">
+                              <button
+                                onClick={() => handleLike(reply.id)}
+                                className="flex items-center space-x-1 text-purple-300 hover:text-red-400 transition-colors"
+                              >
+                                <Heart size={12} />
+                                <span className="text-xs">{reply.likes}</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}

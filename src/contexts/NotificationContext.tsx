@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -64,10 +63,10 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     if (!profile?.is_admin) return;
 
     try {
+      // Use videos_for_approval table instead of videos with is_approved filter
       const { count, error } = await supabase
-        .from('videos')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_approved', false);
+        .from('videos_for_approval')
+        .select('*', { count: 'exact', head: true });
 
       if (error) {
         console.error('Error loading pending videos count:', error);
@@ -133,13 +132,13 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     let videoChannel;
     if (profile.is_admin) {
       videoChannel = supabase
-        .channel('videos')
+        .channel('videos_for_approval')
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
-            table: 'videos'
+            table: 'videos_for_approval'
           },
           () => {
             loadPendingVideosCount();
