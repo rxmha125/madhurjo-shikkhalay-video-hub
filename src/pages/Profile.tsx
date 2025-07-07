@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Pencil, Upload as UploadIcon, Clock, Trash2 } from 'lucide-react';
@@ -138,19 +139,122 @@ const Profile = () => {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !isOwnProfile) return;
+    if (!file || !isOwnProfile || !profile) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a valid image file (JPG, PNG, or WebP)');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast.error('Image must be smaller than 5MB');
+      return;
+    }
 
     setUploadingAvatar(true);
 
     try {
-      // For demo purposes, we'll use a fixed avatar
-      const newAvatar = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+      console.log('Starting image upload for user:', profile.id);
       
-      // Update profile in database
-      await updateProfile({ avatar: newAvatar });
+      // Step 1: Deactivate old profile image if exists
+      const { data: oldImages, error: oldImagesError } = await supabase
+        .from('profile_images')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('is_active', true);
+
+      if (oldImagesError) {
+        console.error('Error fetching old images:', oldImagesError);
+      }
+
+      // Step 2: Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.user_id}/${Date.now()}.${fileExt}`;
+
+      console.log('Uploading file:', fileName);
+
+      // Step 3: Upload new image to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('profile-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error('Failed to upload image');
+        return;
+      }
+
+      console.log('Upload successful:', uploadData);
+
+      // Step 4: Get public URL for the uploaded image
+      const { data: urlData } = supabase.storage
+        .from('profile-images')
+        .getPublicUrl(fileName);
+
+      const imageUrl = urlData.publicUrl;
+      console.log('Image URL:', imageUrl);
+
+      // Step 5: Deactivate old images
+      if (oldImages && oldImages.length > 0) {
+        console.log('Deactivating old images:', oldImages.length);
+        
+        // Mark old images as inactive
+        const { error: deactivateError } = await supabase
+          .from('profile_images')
+          .update({ is_active: false })
+          .eq('user_id', profile.id)
+          .eq('is_active', true);
+
+        if (deactivateError) {
+          console.error('Error deactivating old images:', deactivateError);
+        }
+
+        // Delete old image files from storage
+        for (const oldImage of oldImages) {
+          try {
+            const oldFileName = oldImage.image_url.split('/').pop();
+            if (oldFileName) {
+              const { error: deleteError } = await supabase.storage
+                .from('profile-images')
+                .remove([`${profile.user_id}/${oldFileName}`]);
+              
+              if (deleteError) {
+                console.error('Error deleting old file:', deleteError);
+              }
+            }
+          } catch (error) {
+            console.error('Error processing old image deletion:', error);
+          }
+        }
+      }
+
+      // Step 6: Insert new image record
+      const { error: insertError } = await supabase
+        .from('profile_images')
+        .insert({
+          user_id: profile.id,
+          image_url: imageUrl,
+          is_active: true
+        });
+
+      if (insertError) {
+        console.error('Error inserting image record:', insertError);
+        toast.error('Failed to save image record');
+        return;
+      }
+
+      // Step 7: Update profile with new avatar URL
+      await updateProfile({ avatar: imageUrl });
       
-      // Update local state
-      setProfileUser((prev: any) => ({ ...prev, avatar: newAvatar }));
+      // Step 8: Update local state
+      setProfileUser((prev: any) => ({ ...prev, avatar: imageUrl }));
       
       toast.success('Profile picture updated successfully!');
     } catch (error) {
@@ -221,6 +325,9 @@ const Profile = () => {
                 src={profileUser?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
                 alt={profileUser?.name}
                 className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-blue-500/30"
+                onError={(e) => {
+                  e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+                }}
               />
               
               {isOwnProfile && (
@@ -231,13 +338,13 @@ const Profile = () => {
                     ) : (
                       <>
                         <UploadIcon size={16} className="text-white mx-auto mb-1 md:w-5 md:h-5" />
-                        <p className="text-xs text-white hidden md:block">Choose Image</p>
+                        <p className="text-xs text-white hidden md:block">Upload Image</p>
                       </>
                     )}
                   </div>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
                     onChange={handleImageUpload}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                     disabled={uploadingAvatar}
