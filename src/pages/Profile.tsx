@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Pencil, Upload as UploadIcon, Clock } from 'lucide-react';
+import { Pencil, Upload as UploadIcon, Clock, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import VideoCard from '../components/VideoCard';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +30,7 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [activeTab, setActiveTab] = useState('videos');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [removingVideos, setRemovingVideos] = useState<string[]>([]);
   const [editForm, setEditForm] = useState({
     name: '',
     description: ''
@@ -172,6 +172,32 @@ const Profile = () => {
         console.error('Error updating profile:', error);
         toast.error('Failed to update profile');
       }
+    }
+  };
+
+  const handleRemoveVideo = async (videoId: string) => {
+    setRemovingVideos(prev => [...prev, videoId]);
+
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) {
+        console.error('Error removing video:', error);
+        toast.error('Failed to remove video');
+        return;
+      }
+
+      // Remove video from pending list
+      setPendingVideos(prev => prev.filter(video => video.id !== videoId));
+      toast.success('Video removed successfully');
+    } catch (error) {
+      console.error('Error removing video:', error);
+      toast.error('Failed to remove video');
+    } finally {
+      setRemovingVideos(prev => prev.filter(id => id !== videoId));
     }
   };
 
@@ -361,6 +387,20 @@ const Profile = () => {
                         <VideoCard video={video} />
                         <div className="absolute top-2 right-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded font-medium">
                           Pending
+                        </div>
+                        <div className="absolute bottom-2 right-2">
+                          <button
+                            onClick={() => handleRemoveVideo(video.id)}
+                            disabled={removingVideos.includes(video.id)}
+                            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white p-2 rounded-lg transition-colors shadow-lg"
+                            title="Remove video"
+                          >
+                            {removingVideos.includes(video.id) ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </button>
                         </div>
                       </div>
                     ))}

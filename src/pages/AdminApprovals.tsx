@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Clock, Check, X, Eye } from 'lucide-react';
+import { Clock, Check, X } from 'lucide-react';
 
 interface PendingVideo {
   id: string;
@@ -33,6 +33,7 @@ const AdminApprovals = () => {
   }, [profile]);
 
   const loadPendingVideos = async () => {
+    console.log('Loading pending videos for admin...');
     try {
       const { data, error } = await supabase
         .from('videos')
@@ -45,8 +46,11 @@ const AdminApprovals = () => {
 
       if (error) {
         console.error('Error loading pending videos:', error);
+        toast.error('Failed to load pending videos');
         return;
       }
+
+      console.log('Raw pending videos data:', data);
 
       const formattedVideos = data?.map(video => ({
         id: video.id,
@@ -61,15 +65,18 @@ const AdminApprovals = () => {
         }
       })) || [];
 
+      console.log('Formatted pending videos:', formattedVideos);
       setPendingVideos(formattedVideos);
     } catch (error) {
       console.error('Error loading pending videos:', error);
+      toast.error('Failed to load pending videos');
     } finally {
       setLoading(false);
     }
   };
 
   const handleVideoAction = async (videoId: string, approved: boolean) => {
+    console.log(`${approved ? 'Approving' : 'Declining'} video:`, videoId);
     setProcessingVideos(prev => [...prev, videoId]);
 
     try {
