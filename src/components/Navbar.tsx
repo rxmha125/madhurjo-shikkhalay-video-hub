@@ -33,6 +33,13 @@ const Navbar = () => {
     }
   };
 
+  // Function to get admin profile ID (assuming first admin in the system)
+  const getAdminProfileId = () => {
+    // You might want to replace this with the actual admin user ID
+    // For now, we'll navigate to the info page which shows the admin profile
+    return '/info';
+  };
+
   return (
     <>
       <nav className="sticky top-0 z-50 bg-black/20 backdrop-blur-md border-b border-white/10">
@@ -50,7 +57,7 @@ const Navbar = () => {
               {/* Desktop Social Links */}
               <div className="hidden md:flex items-center space-x-4">
                 <a 
-                  href="https://facebook.com" 
+                  href="https://www.facebook.com/profile.php?id=61577217854996" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="nav-link flex items-center space-x-2"
@@ -60,7 +67,7 @@ const Navbar = () => {
                 </a>
                 
                 <a 
-                  href="https://youtube.com" 
+                  href="https://www.youtube.com/@harajhero4820" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="nav-link flex items-center space-x-2"
@@ -144,7 +151,7 @@ const Navbar = () => {
                   {/* Sir's Profile Button (only for non-admin users) */}
                   {!profile.is_admin && (
                     <Link 
-                      to="/info" 
+                      to={getAdminProfileId()}
                       className="btn-secondary text-xs sm:text-sm hidden sm:block"
                     >
                       Sir's Profile
@@ -229,7 +236,7 @@ const Navbar = () => {
                 <div className="pt-4 border-t border-white/10 md:hidden">
                   <div className="flex space-x-4">
                     <a 
-                      href="https://facebook.com" 
+                      href="https://www.facebook.com/profile.php?id=61577217854996" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="nav-link flex items-center space-x-2"
@@ -239,7 +246,7 @@ const Navbar = () => {
                     </a>
                     
                     <a 
-                      href="https://youtube.com" 
+                      href="https://www.youtube.com/@harajhero4820" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="nav-link flex items-center space-x-2"

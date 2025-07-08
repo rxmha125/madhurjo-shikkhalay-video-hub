@@ -1,7 +1,11 @@
 
 import React from 'react';
+import { useCountAnimation } from '../hooks/useCountAnimation';
 
 const HeroSection = () => {
+  const videosCount = useCountAnimation({ end: 100, duration: 2000 });
+  const studentsCount = useCountAnimation({ end: 500, duration: 2000 });
+
   const scrollToExplore = () => {
     const exploreElement = document.getElementById('explore');
     if (exploreElement) {
@@ -46,11 +50,11 @@ const HeroSection = () => {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-8 mt-20 max-w-md mx-auto">
           <div className="text-center">
-            <div className="text-2xl md:text-3xl font-bold text-white mb-2">100+</div>
+            <div className="text-2xl md:text-3xl font-bold text-white mb-2">{videosCount}+</div>
             <div className="text-sm text-gray-400">Educational Videos</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl md:text-3xl font-bold text-white mb-2">500+</div>
+            <div className="text-2xl md:text-3xl font-bold text-white mb-2">{studentsCount}+</div>
             <div className="text-sm text-gray-400">Active Students</div>
           </div>
           <div className="text-center">
