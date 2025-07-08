@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bell, Upload, Facebook, Youtube, Menu, X, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,7 @@ import AuthModal from './AuthModal';
 import UploadModal from './UploadModal';
 import NotificationDropdown from './NotificationDropdown';
 import ProfileDropdown from './ProfileDropdown';
+import { supabase } from '@/integrations/supabase/client';
 
 const Navbar = () => {
   const location = useLocation();
@@ -18,6 +19,34 @@ const Navbar = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [adminProfileId, setAdminProfileId] = useState<string | null>(null);
+
+  // Fetch admin profile ID on component mount
+  useEffect(() => {
+    const fetchAdminProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('is_admin', true)
+          .limit(1)
+          .single();
+
+        if (error) {
+          console.error('Error fetching admin profile:', error);
+          return;
+        }
+
+        if (data) {
+          setAdminProfileId(data.id);
+        }
+      } catch (error) {
+        console.error('Error fetching admin profile:', error);
+      }
+    };
+
+    fetchAdminProfile();
+  }, []);
 
   const scrollToSection = (sectionId: string) => {
     setIsMobileMenuOpen(false);
@@ -31,13 +60,6 @@ const Navbar = () => {
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
-  };
-
-  // Function to get admin profile ID (assuming first admin in the system)
-  const getAdminProfileId = () => {
-    // You might want to replace this with the actual admin user ID
-    // For now, we'll navigate to the info page which shows the admin profile
-    return '/info';
   };
 
   return (
@@ -149,9 +171,9 @@ const Navbar = () => {
               {profile ? (
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   {/* Sir's Profile Button (only for non-admin users) */}
-                  {!profile.is_admin && (
+                  {!profile.is_admin && adminProfileId && (
                     <Link 
-                      to={getAdminProfileId()}
+                      to={`/profile/${adminProfileId}`}
                       className="btn-secondary text-xs sm:text-sm hidden sm:block"
                     >
                       Sir's Profile
