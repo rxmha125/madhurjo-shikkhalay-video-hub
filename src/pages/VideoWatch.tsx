@@ -8,6 +8,8 @@ import { useFollowSystem } from '../hooks/useFollowSystem';
 import { useViewTracking } from '../hooks/useViewTracking';
 import { formatTimeAgo } from '../utils/timeUtils';
 import CommentSection from '../components/CommentSection';
+import CustomVideoPlayer from '../components/CustomVideoPlayer';
+import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import { toast } from 'sonner';
 
 interface Video {
@@ -37,6 +39,7 @@ const VideoWatch = () => {
   const [isLiking, setIsLiking] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { isFollowing, followerCount, isLoading: followLoading, toggleFollow } = useFollowSystem(video?.creator_id);
   useViewTracking(id || '');
@@ -217,9 +220,6 @@ const VideoWatch = () => {
   const handleDeleteVideo = async () => {
     if (!video || !profile || !isOwnVideo) return;
 
-    const confirmed = window.confirm('Are you sure you want to delete this video? This action cannot be undone.');
-    if (!confirmed) return;
-
     setIsDeleting(true);
 
     try {
@@ -237,6 +237,7 @@ const VideoWatch = () => {
       toast.error('Failed to delete video');
     } finally {
       setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -281,16 +282,11 @@ const VideoWatch = () => {
           <div className="lg:col-span-2">
             <div className="rounded-xl bg-black/60 backdrop-blur-sm border border-gray-700 overflow-hidden shadow-2xl">
               {video.video_url ? (
-                <video
+                <CustomVideoPlayer
                   src={video.video_url}
                   poster={thumbnailToShow}
-                  controls
-                  className="w-full aspect-video bg-black"
-                  style={{ outline: 'none' }}
-                  preload="metadata"
-                >
-                  Your browser does not support the video tag.
-                </video>
+                  className="aspect-video"
+                />
               ) : (
                 <div className="aspect-video flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
                   <div className="text-center">
@@ -379,12 +375,12 @@ const VideoWatch = () => {
 
                   {isOwnVideo && (
                     <button
-                      onClick={handleDeleteVideo}
+                      onClick={() => setShowDeleteDialog(true)}
                       disabled={isDeleting}
                       className="flex items-center space-x-2 px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-xl transition-all duration-300"
                     >
                       <Trash2 size={16} />
-                      <span className="hidden sm:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                      <span className="hidden sm:inline">Delete</span>
                     </button>
                   )}
                 </div>
@@ -419,6 +415,15 @@ const VideoWatch = () => {
           </div>
         </div>
       </div>
+      
+      <DeleteConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDeleteVideo}
+        title="Delete Video"
+        message="Are you confirming to delete this video? This action cannot be undone."
+        isLoading={isDeleting}
+      />
     </div>
   );
 };

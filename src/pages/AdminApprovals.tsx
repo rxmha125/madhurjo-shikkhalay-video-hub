@@ -250,7 +250,7 @@ const AdminApprovals = () => {
 
         {pendingVideos.length === 0 ? (
           <div className="text-center py-20">
-            <div className="text-6xl mb-4">✅</div>
+            <Check size={64} className="text-green-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-4">All caught up!</h2>
             <p className="text-gray-400">No videos pending approval at the moment.</p>
           </div>

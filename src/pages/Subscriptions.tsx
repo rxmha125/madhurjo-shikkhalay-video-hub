@@ -150,7 +150,7 @@ const Subscriptions = () => {
 
         {followedUsers.length === 0 ? (
           <div className="text-center py-20">
-            <div className="text-6xl mb-4">👥</div>
+            <Users size={64} className="text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white mb-4">No Subscriptions Yet</h2>
             <p className="text-gray-400">
               Start following creators to see them here and get notified about their new videos!
