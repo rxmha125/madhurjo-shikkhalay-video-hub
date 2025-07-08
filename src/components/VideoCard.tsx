@@ -24,8 +24,6 @@ interface VideoCardProps {
 
 const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
   const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const fetchThumbnail = async () => {
@@ -35,7 +33,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
           .select('thumbnail_url')
           .eq('video_id', video.id)
           .eq('is_active', true)
-          .maybeSingle(); // Use maybeSingle instead of single to avoid errors
+          .single();
 
         if (thumbnailData?.thumbnail_url) {
           setActualThumbnail(thumbnailData.thumbnail_url);
@@ -55,41 +53,23 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
 
   const thumbnailToShow = actualThumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
 
-  const handleImageLoad = () => {
-    setImageLoaded(true);
-    setImageError(false);
-  };
-
-  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    if (!imageError) {
-      e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
-      setImageError(true);
-    }
-  };
+  const TITLE_LIMIT = 60;
+  const shouldTruncateTitle = video.title.length > TITLE_LIMIT;
+  const displayTitle = shouldTruncateTitle ? `${video.title.substring(0, TITLE_LIMIT)}...` : video.title;
 
   return (
     <Link to={`/watch/${video.id}`} className="group block">
       <div className="bg-transparent hover:bg-gray-800/20 rounded-xl overflow-hidden transition-all duration-200 cursor-pointer">
         {/* Thumbnail Container */}
         <div className="relative aspect-video mb-3">
-          {/* Loading placeholder */}
-          {!imageLoaded && (
-            <div className="absolute inset-0 bg-gray-700 animate-pulse rounded-xl flex items-center justify-center">
-              <div className="text-gray-500 text-xs">Loading...</div>
-            </div>
-          )}
-          
           <img
             src={thumbnailToShow}
             alt={video.title}
-            className={`w-full h-full object-cover rounded-xl group-hover:rounded-lg transition-all duration-200 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            loading="lazy" // Native lazy loading as backup
+            className="w-full h-full object-cover rounded-xl group-hover:rounded-lg transition-all duration-200"
+            onError={(e) => {
+              e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
+            }}
           />
-          
           {/* Hover overlay */}
           <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-xl group-hover:rounded-lg" />
         </div>
@@ -105,7 +85,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
               onError={(e) => {
                 e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
               }}
-              loading="lazy"
             />
           </div>
           
