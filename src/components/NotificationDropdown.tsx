@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { Check, Clock, Heart, MessageCircle, Upload } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Check, Clock, Heart, MessageCircle, Upload, X } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
 
 interface NotificationDropdownProps {
@@ -9,7 +9,24 @@ interface NotificationDropdownProps {
 }
 
 const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onClose }) => {
-  const { notifications, markAsRead, markAllAsRead } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, clearAllNotifications } = useNotifications();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -27,18 +44,31 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOpen, onC
   };
 
   return (
-    <div className="absolute top-12 right-0 w-80 max-w-[calc(100vw-2rem)] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden">
+    <div 
+      ref={dropdownRef}
+      className="absolute top-12 right-0 w-80 max-w-[calc(100vw-2rem)] bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden"
+    >
       <div className="p-4 border-b border-gray-700">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-white">Notifications</h3>
-          {notifications.some(n => !n.is_read) && (
-            <button
-              onClick={markAllAsRead}
-              className="text-sm text-blue-400 hover:text-blue-300"
-            >
-              Mark all read
-            </button>
-          )}
+          <div className="flex items-center space-x-2">
+            {notifications.some(n => !n.is_read) && (
+              <button
+                onClick={markAllAsRead}
+                className="text-sm text-blue-400 hover:text-blue-300"
+              >
+                Mark all read
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button
+                onClick={clearAllNotifications}
+                className="text-sm text-red-400 hover:text-red-300"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

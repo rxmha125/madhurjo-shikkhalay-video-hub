@@ -24,7 +24,6 @@ interface VideoCardProps {
 
 const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
   const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
-  const [showFullTitle, setShowFullTitle] = useState(false);
 
   useEffect(() => {
     const fetchThumbnail = async () => {
@@ -56,15 +55,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
 
   const TITLE_LIMIT = 60;
   const shouldTruncateTitle = video.title.length > TITLE_LIMIT;
-  const displayTitle = showFullTitle || !shouldTruncateTitle ? video.title : `${video.title.substring(0, TITLE_LIMIT)}...`;
-
-  const handleTitleClick = (e: React.MouseEvent) => {
-    if (shouldTruncateTitle) {
-      e.preventDefault();
-      e.stopPropagation();
-      setShowFullTitle(!showFullTitle);
-    }
-  };
+  const displayTitle = shouldTruncateTitle ? `${video.title.substring(0, TITLE_LIMIT)}...` : video.title;
 
   return (
     <Link to={`/watch/${video.id}`} className="group block">
@@ -83,10 +74,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
         
         <div className="p-4">
           <h3 
-            className={`font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300 ${
-              shouldTruncateTitle ? 'cursor-pointer' : ''
-            }`}
-            onClick={handleTitleClick}
+            className="font-semibold text-white mb-2 transition-colors duration-300"
             title={video.title}
           >
             {displayTitle}

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, LogOut, Clock, CreditCard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,6 +13,23 @@ interface ProfileDropdownProps {
 const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose }) => {
   const { profile, logout } = useAuth();
   const { pendingVideosCount } = useNotifications();
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen || !profile) return null;
 
@@ -22,7 +39,10 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ isOpen, onClose }) =>
   };
 
   return (
-    <div className="absolute top-12 right-0 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 animate-fade-in">
+    <div 
+      ref={dropdownRef}
+      className="absolute top-12 right-0 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 animate-fade-in"
+    >
       <div className="p-2">
         <Link
           to={`/profile/${profile.id}`}

@@ -19,6 +19,7 @@ interface NotificationContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   addNotification: (notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>) => void;
+  clearAllNotifications: () => void;
   pendingVideosCount: number;
   refreshPendingCount: () => void;
 }
@@ -200,6 +201,26 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  const clearAllNotifications = async () => {
+    if (!profile) return;
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', profile.id);
+
+      if (error) {
+        console.error('Error clearing all notifications:', error);
+        return;
+      }
+
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+    }
+  };
+
   const addNotification = async (notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>) => {
     try {
       const { error } = await supabase
@@ -226,6 +247,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
       markAsRead,
       markAllAsRead,
       addNotification,
+      clearAllNotifications,
       pendingVideosCount,
       refreshPendingCount
     }}>
