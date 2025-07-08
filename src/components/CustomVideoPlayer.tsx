@@ -205,7 +205,10 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
       )}
 
       {/* Controls overlay */}
-      <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
+      <div 
+        className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
+        onClick={togglePlay}
+      >
         
         {/* Center play/pause button */}
         {(!isPlaying || showPauseAnimation) && (
@@ -221,7 +224,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
         )}
 
         {/* Bottom controls */}
-        <div className="absolute bottom-0 left-0 right-0 p-4">
+        <div className="absolute bottom-0 left-0 right-0 p-4" onClick={(e) => e.stopPropagation()}>
           {/* Progress bar */}
           <div 
             ref={progressRef}
