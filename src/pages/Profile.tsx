@@ -329,10 +329,29 @@ const Profile = () => {
 
       const thumbnailUrl = urlData.publicUrl;
       
+      // Update the video's thumbnail in the database immediately
+      const { error: updateError } = await supabase
+        .from('videos')
+        .update({ thumbnail: thumbnailUrl })
+        .eq('id', editingVideo);
+
+      if (updateError) {
+        console.error('Error updating video thumbnail:', updateError);
+        toast.error('Failed to update video thumbnail');
+        return;
+      }
+
       // Update form state with new thumbnail URL
       setVideoEditForm(prev => ({ ...prev, thumbnail: thumbnailUrl }));
       
-      toast.success('Thumbnail uploaded successfully!');
+      // Update local videos state to show the new thumbnail immediately
+      setVideos(prev => prev.map(video => 
+        video.id === editingVideo 
+          ? { ...video, thumbnail: thumbnailUrl }
+          : video
+      ));
+      
+      toast.success('Thumbnail uploaded and updated successfully!');
     } catch (error) {
       console.error('Error uploading thumbnail:', error);
       toast.error('Failed to upload thumbnail');
