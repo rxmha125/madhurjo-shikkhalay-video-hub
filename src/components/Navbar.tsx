@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bell, Upload, Facebook, Youtube, Menu, X, Clock } from 'lucide-react';
@@ -253,6 +252,17 @@ const Navbar = () => {
                 >
                   Info
                 </Link>
+
+                {/* Sir's Profile Button - Mobile (only for non-admin users) */}
+                {profile && !profile.is_admin && adminProfileId && (
+                  <Link 
+                    to={`/profile/${adminProfileId}`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="nav-link text-left text-blue-400"
+                  >
+                    Sir's Profile
+                  </Link>
+                )}
 
                 {/* Mobile Social Links */}
                 <div className="pt-4 border-t border-white/10 md:hidden">
