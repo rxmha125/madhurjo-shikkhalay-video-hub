@@ -17,6 +17,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
   const [volume, setVolume] = useState(1);
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [skipAnimation, setSkipAnimation] = useState<{ type: 'forward' | 'backward', seconds: number } | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -110,6 +111,15 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
     if (!video) return;
 
     video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seconds));
+    
+    // Show skip animation
+    setSkipAnimation({ 
+      type: seconds > 0 ? 'forward' : 'backward', 
+      seconds: Math.abs(seconds) 
+    });
+    
+    // Hide animation after 1 second
+    setTimeout(() => setSkipAnimation(null), 1000);
   };
 
   const changeVolume = (delta: number) => {
@@ -174,36 +184,50 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
         </div>
       )}
 
+      {/* Skip Animation */}
+      {skipAnimation && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/80 backdrop-blur-sm rounded-lg px-4 py-2 flex items-center space-x-2 animate-fade-in">
+            {skipAnimation.type === 'forward' ? (
+              <SkipForward size={20} className="text-white" />
+            ) : (
+              <SkipBack size={20} className="text-white" />
+            )}
+            <span className="text-white font-medium">
+              {skipAnimation.seconds} seconds
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Controls overlay */}
       <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
         
-        {/* Center play button */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <button
-            onClick={togglePlay}
-            className="w-16 h-16 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 hover:scale-110"
-          >
-            {isPlaying ? (
-              <Pause size={24} className="text-white" />
-            ) : (
+        {/* Center play button - only show when paused */}
+        {!isPlaying && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <button
+              onClick={togglePlay}
+              className="w-16 h-16 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 hover:scale-110"
+            >
               <Play size={24} className="text-white ml-1" />
-            )}
-          </button>
-        </div>
+            </button>
+          </div>
+        )}
 
         {/* Bottom controls */}
         <div className="absolute bottom-0 left-0 right-0 p-4">
           {/* Progress bar */}
           <div 
             ref={progressRef}
-            className="w-full h-1 bg-gray-600 rounded-full cursor-pointer mb-4 group/progress"
+            className="w-full h-1 bg-gray-600 rounded-full cursor-pointer mb-4 group/progress hover:h-2 transition-all duration-200"
             onClick={handleProgressClick}
           >
             <div 
               className="h-full bg-red-600 rounded-full relative transition-all duration-150"
               style={{ width: `${progressPercentage}%` }}
             >
-              <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-red-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity"></div>
+              <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all duration-200 cursor-grab active:cursor-grabbing scale-0 group-hover/progress:scale-100"></div>
             </div>
           </div>
 
