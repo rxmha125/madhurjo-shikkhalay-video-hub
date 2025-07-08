@@ -1,5 +1,6 @@
+
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, SkipBack, SkipForward, Repeat } from 'lucide-react';
 
 interface CustomVideoPlayerProps {
   src: string;
@@ -19,6 +20,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
   const [isBuffering, setIsBuffering] = useState(false);
   const [skipAnimation, setSkipAnimation] = useState<{ type: 'forward' | 'backward', seconds: number } | null>(null);
   const [showPauseAnimation, setShowPauseAnimation] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -48,6 +50,14 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
     };
   }, []);
 
+  // Update video loop property when isLooping changes
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.loop = isLooping;
+    }
+  }, [isLooping]);
+
   // Keyboard controls
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
@@ -64,6 +74,9 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
           break;
         case 'f':
           toggleFullscreen();
+          break;
+        case 'l':
+          toggleLoop();
           break;
         case 'ArrowLeft':
           skip(-10);
@@ -108,6 +121,10 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
 
     video.muted = !video.muted;
     setIsMuted(video.muted);
+  };
+
+  const toggleLoop = () => {
+    setIsLooping(!isLooping);
   };
 
   const skip = (seconds: number) => {
@@ -241,7 +258,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
 
           {/* Control buttons */}
           <div className="flex items-center justify-between text-white">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button onClick={togglePlay} className="hover:text-red-400 transition-colors">
                 {isPlaying ? <Pause size={20} /> : <Play size={20} />}
               </button>
@@ -252,6 +269,14 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
               
               <button onClick={() => skip(10)} className="hover:text-red-400 transition-colors">
                 <SkipForward size={18} />
+              </button>
+
+              <button 
+                onClick={toggleLoop} 
+                className={`hover:text-red-400 transition-colors ${isLooping ? 'text-red-400' : ''}`}
+                title={isLooping ? 'Loop enabled (L)' : 'Enable loop (L)'}
+              >
+                <Repeat size={18} />
               </button>
 
               <div className="flex items-center space-x-2">
@@ -273,11 +298,11 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
                       videoRef.current.muted = newVolume === 0;
                     }
                   }}
-                  className="w-20 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer"
+                  className="w-16 sm:w-20 h-1 bg-gray-600 rounded-full appearance-none cursor-pointer"
                 />
               </div>
 
-              <span className="text-sm">
+              <span className="text-xs sm:text-sm">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
