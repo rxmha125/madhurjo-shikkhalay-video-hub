@@ -40,6 +40,8 @@ const VideoWatch = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showFullTitle, setShowFullTitle] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   const { isFollowing, followerCount, isLoading: followLoading, toggleFollow } = useFollowSystem(video?.creator_id);
   useViewTracking(id || '');
@@ -275,6 +277,16 @@ const VideoWatch = () => {
 
   const thumbnailToShow = actualThumbnail || video.thumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
 
+  // Title and description limits
+  const TITLE_LIMIT = 80;
+  const DESCRIPTION_LIMIT = 150;
+  
+  const shouldTruncateTitle = video.title.length > TITLE_LIMIT;
+  const shouldTruncateDescription = video.description && video.description.length > DESCRIPTION_LIMIT;
+  
+  const displayTitle = showFullTitle || !shouldTruncateTitle ? video.title : `${video.title.substring(0, TITLE_LIMIT)}...`;
+  const displayDescription = showFullDescription || !shouldTruncateDescription ? video.description : `${video.description?.substring(0, DESCRIPTION_LIMIT)}...`;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="container mx-auto px-4 py-20">
@@ -298,9 +310,24 @@ const VideoWatch = () => {
             </div>
 
             <div className="mt-6 space-y-6">
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                {video.title}
-              </h1>
+              <div>
+                <h1 
+                  className={`text-2xl sm:text-3xl font-bold text-white ${
+                    shouldTruncateTitle ? 'cursor-pointer hover:text-blue-400' : ''
+                  } transition-colors duration-300`}
+                  onClick={() => shouldTruncateTitle && setShowFullTitle(!showFullTitle)}
+                >
+                  {displayTitle}
+                </h1>
+                {shouldTruncateTitle && (
+                  <button
+                    onClick={() => setShowFullTitle(!showFullTitle)}
+                    className="text-sm text-blue-400 hover:text-blue-300 mt-1"
+                  >
+                    {showFullTitle ? 'Show less' : 'Show more'}
+                  </button>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm">
                 <div className="flex items-center space-x-1">
@@ -389,9 +416,19 @@ const VideoWatch = () => {
               {video.description && (
                 <div className="bg-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-xl p-6">
                   <h3 className="font-semibold text-white mb-3">Description</h3>
-                  <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                    {video.description}
-                  </p>
+                  <div>
+                    <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                      {displayDescription}
+                    </p>
+                    {shouldTruncateDescription && (
+                      <button
+                        onClick={() => setShowFullDescription(!showFullDescription)}
+                        className="text-sm text-blue-400 hover:text-blue-300 mt-2 block"
+                      >
+                        {showFullDescription ? 'Show less' : 'Show more'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

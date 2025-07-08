@@ -24,6 +24,7 @@ interface VideoCardProps {
 
 const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
   const [actualThumbnail, setActualThumbnail] = useState<string | null>(null);
+  const [showFullTitle, setShowFullTitle] = useState(false);
 
   useEffect(() => {
     const fetchThumbnail = async () => {
@@ -53,6 +54,18 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
 
   const thumbnailToShow = actualThumbnail || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
 
+  const TITLE_LIMIT = 60;
+  const shouldTruncateTitle = video.title.length > TITLE_LIMIT;
+  const displayTitle = showFullTitle || !shouldTruncateTitle ? video.title : `${video.title.substring(0, TITLE_LIMIT)}...`;
+
+  const handleTitleClick = (e: React.MouseEvent) => {
+    if (shouldTruncateTitle) {
+      e.preventDefault();
+      e.stopPropagation();
+      setShowFullTitle(!showFullTitle);
+    }
+  };
+
   return (
     <Link to={`/watch/${video.id}`} className="group block">
       <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-xl hover:border-gray-600 hover:bg-gray-800/70 transition-all duration-300">
@@ -69,8 +82,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
         </div>
         
         <div className="p-4">
-          <h3 className="font-semibold text-white mb-2 line-clamp-2 group-hover:text-blue-400 transition-colors duration-300">
-            {video.title}
+          <h3 
+            className={`font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors duration-300 ${
+              shouldTruncateTitle ? 'cursor-pointer' : ''
+            }`}
+            onClick={handleTitleClick}
+            title={video.title}
+          >
+            {displayTitle}
           </h3>
           
           <div className="flex items-center space-x-2 mb-3">
