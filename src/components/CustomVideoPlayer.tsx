@@ -18,6 +18,7 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
   const [showControls, setShowControls] = useState(true);
   const [isBuffering, setIsBuffering] = useState(false);
   const [skipAnimation, setSkipAnimation] = useState<{ type: 'forward' | 'backward', seconds: number } | null>(null);
+  const [showPauseAnimation, setShowPauseAnimation] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -92,6 +93,9 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
     if (isPlaying) {
       video.pause();
       setIsPlaying(false);
+      // Show pause animation briefly
+      setShowPauseAnimation(true);
+      setTimeout(() => setShowPauseAnimation(false), 500);
     } else {
       video.play();
       setIsPlaying(true);
@@ -203,15 +207,16 @@ const CustomVideoPlayer: React.FC<CustomVideoPlayerProps> = ({ src, poster, clas
       {/* Controls overlay */}
       <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}>
         
-        {/* Center play button - only show when paused */}
-        {!isPlaying && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <button
-              onClick={togglePlay}
-              className="w-16 h-16 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-full transition-all duration-300 hover:scale-110"
-            >
-              <Play size={24} className="text-white ml-1" />
-            </button>
+        {/* Center play/pause button */}
+        {(!isPlaying || showPauseAnimation) && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className={`w-16 h-16 flex items-center justify-center bg-black/50 rounded-full transition-all duration-300 ${showPauseAnimation ? 'animate-scale-in' : ''}`}>
+              {!isPlaying ? (
+                <Play size={24} className="text-white ml-1" />
+              ) : (
+                <Pause size={24} className="text-white" />
+              )}
+            </div>
           </div>
         )}
 
