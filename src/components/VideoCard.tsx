@@ -59,64 +59,52 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
 
   return (
     <Link to={`/watch/${video.id}`} className="group block">
-      <div className="bg-transparent hover:bg-gray-800/20 rounded-xl overflow-hidden transition-all duration-200 cursor-pointer">
-        {/* Thumbnail Container */}
-        <div className="relative aspect-video mb-3">
+      <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700 rounded-xl overflow-hidden shadow-lg hover:shadow-xl hover:border-gray-600 hover:bg-gray-800/70 transition-all duration-300">
+        <div className="relative aspect-video">
           <img
             src={thumbnailToShow}
             alt={video.title}
-            className="w-full h-full object-cover rounded-xl group-hover:rounded-lg transition-all duration-200"
+            className="w-full h-full object-cover group-hover:brightness-110 transition-all duration-300"
             onError={(e) => {
               e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
             }}
           />
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-xl group-hover:rounded-lg" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
         </div>
         
-        {/* Content Container */}
-        <div className="flex gap-3">
-          {/* Creator Avatar */}
-          <div className="flex-shrink-0 pt-1">
+        <div className="p-4">
+          <h3 
+            className="font-semibold text-white mb-2 transition-colors duration-300"
+            title={video.title}
+          >
+            {displayTitle}
+          </h3>
+          
+          <div className="flex items-center space-x-2 mb-3">
             <img
               src={video.creator?.avatar || '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png'}
               alt={video.creator.name}
-              className="w-9 h-9 rounded-full object-cover"
+              className="w-6 h-6 rounded-full object-cover border border-gray-600"
               onError={(e) => {
                 e.currentTarget.src = '/lovable-uploads/544d0b71-3b60-4f04-81da-d190b8007a11.png';
               }}
             />
-          </div>
-          
-          {/* Video Info */}
-          <div className="flex-1 min-w-0">
-            {/* Title */}
-            <h3 
-              className="font-medium text-white text-sm leading-5 mb-1 group-hover:text-blue-400 transition-colors duration-200"
-              title={video.title}
-              style={{
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden'
-              }}
-            >
-              {video.title}
-            </h3>
-            
-            {/* Creator Name */}
             <Link 
               to={`/profile/${video.creator.id}`}
-              className="text-sm text-gray-400 hover:text-white transition-colors duration-200 block mb-1"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
               {video.creator.name}
             </Link>
-            
-            {/* Views and Date */}
-            <div className="flex items-center text-xs text-gray-400 space-x-1">
+          </div>
+          
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center space-x-1">
+              <Eye size={12} />
               <span>{video.views} views</span>
-              <span>•</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Calendar size={12} />
               <span>{formatTimeAgo(video.created_at)}</span>
             </div>
           </div>
