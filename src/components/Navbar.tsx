@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Bell, Upload, Facebook, Youtube, Menu, X, Clock } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +8,6 @@ import AuthModal from './AuthModal';
 import UploadModal from './UploadModal';
 import NotificationDropdown from './NotificationDropdown';
 import ProfileDropdown from './ProfileDropdown';
-import { supabase } from '@/integrations/supabase/client';
 
 const Navbar = () => {
   const location = useLocation();
@@ -19,34 +18,6 @@ const Navbar = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [adminProfileId, setAdminProfileId] = useState<string | null>(null);
-
-  // Fetch admin profile ID on component mount
-  useEffect(() => {
-    const fetchAdminProfile = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('is_admin', true)
-          .limit(1)
-          .single();
-
-        if (error) {
-          console.error('Error fetching admin profile:', error);
-          return;
-        }
-
-        if (data) {
-          setAdminProfileId(data.id);
-        }
-      } catch (error) {
-        console.error('Error fetching admin profile:', error);
-      }
-    };
-
-    fetchAdminProfile();
-  }, []);
 
   const scrollToSection = (sectionId: string) => {
     setIsMobileMenuOpen(false);
@@ -79,7 +50,7 @@ const Navbar = () => {
               {/* Desktop Social Links */}
               <div className="hidden md:flex items-center space-x-4">
                 <a 
-                  href="https://www.facebook.com/profile.php?id=61577217854996" 
+                  href="https://facebook.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="nav-link flex items-center space-x-2"
@@ -89,7 +60,7 @@ const Navbar = () => {
                 </a>
                 
                 <a 
-                  href="https://www.youtube.com/@harajhero4820" 
+                  href="https://youtube.com" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="nav-link flex items-center space-x-2"
@@ -171,9 +142,9 @@ const Navbar = () => {
               {profile ? (
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   {/* Sir's Profile Button (only for non-admin users) */}
-                  {!profile.is_admin && adminProfileId && (
+                  {!profile.is_admin && (
                     <Link 
-                      to={`/profile/${adminProfileId}`}
+                      to="/info" 
                       className="btn-secondary text-xs sm:text-sm hidden sm:block"
                     >
                       Sir's Profile
@@ -258,7 +229,7 @@ const Navbar = () => {
                 <div className="pt-4 border-t border-white/10 md:hidden">
                   <div className="flex space-x-4">
                     <a 
-                      href="https://www.facebook.com/profile.php?id=61577217854996" 
+                      href="https://facebook.com" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="nav-link flex items-center space-x-2"
@@ -268,7 +239,7 @@ const Navbar = () => {
                     </a>
                     
                     <a 
-                      href="https://www.youtube.com/@harajhero4820" 
+                      href="https://youtube.com" 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="nav-link flex items-center space-x-2"
